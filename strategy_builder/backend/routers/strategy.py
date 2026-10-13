@@ -54,7 +54,7 @@ def get_stock_name(code: str) -> str:
     all_symbols = _get_all_symbols() or FALLBACK_STOCKS
 
     for stock in all_symbols:
-        if stock["code"] == code:
+        if code.upper() in (stock["code"], stock["id"]):
             return stock["name"]
 
     return code
@@ -83,7 +83,10 @@ class SignalResult(BaseModel):
     action: str
     strength: float
     reason: str
-    target_price: Optional[int] = None
+    target_price: Optional[float] = None
+    currency: str = "KRW"
+    exchange: str = "krx"
+    order_supported: bool = True
 
 
 class LogEntry(BaseModel):

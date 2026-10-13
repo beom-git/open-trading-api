@@ -15,6 +15,9 @@ export interface Signal {
 
 // Alias for API response
 export interface SignalResult {
+  currency?: "KRW" | "USD";
+  exchange?: string;
+  order_supported?: boolean;
   code: string;
   name: string;
   action: SignalAction;

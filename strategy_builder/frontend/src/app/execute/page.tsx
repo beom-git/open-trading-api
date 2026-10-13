@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Play, Loader2, Zap } from "lucide-react";
 import {
   StrategySelector,
@@ -22,6 +22,7 @@ import {
   type PendingOrder,
   type CancelOrderRequest,
 } from "@/lib/api";
+import { isUSInstrument, tickerOf } from "@/lib/instruments";
 import type { SignalResult } from "@/types/signal";
 import type { OrderRequest, OrderResult } from "@/types/order";
 import type { BuyableInfo } from "@/types/account";
@@ -45,6 +46,9 @@ export default function ExecutePage() {
 
   const [stocks, setStocks] = useState<string[]>([]);
   const [selectedSignal, setSelectedSignal] = useState<SignalResult | null>(null);
+  const selectionVersion = useRef(0);
+  const [quoteError, setQuoteError] = useState("");
+  const [quoteLoading, setQuoteLoading] = useState(false);
   const [priceData, setPriceData] = useState<PriceData | null>(null);
   const [buyableInfo, setBuyableInfo] = useState<BuyableInfo | null>(null);
   const [sellableQty, setSellableQty] = useState<number | null>(null);
@@ -120,13 +124,33 @@ export default function ExecutePage() {
   };
 
   const handleSignalSelect = async (signal: SignalResult) => {
+    const version = ++selectionVersion.current;
     setSelectedSignal(signal);
+    setShowOrderModal(false);
+    setQuoteError("");
+    if (isUSInstrument(signal.code)) {
+      setPriceData(null);
+      setQuoteLoading(true);
+      try {
+        const response = await getCurrentPrice(signal.code, authStatus.mode);
+        if (version !== selectionVersion.current) return;
+        if (response.status === "success" && response.data) setPriceData(response.data);
+        else setQuoteError(response.message || "시세 조회에 실패했습니다");
+      } catch {
+        if (version === selectionVersion.current) setQuoteError("시세 조회에 실패했습니다");
+      } finally {
+        if (version === selectionVersion.current) setQuoteLoading(false);
+      }
+      return;
+    }
+    if (signal.order_supported === false) return;
 
     // Only allow order for BUY/SELL signals
     if (signal.action === "BUY" || signal.action === "SELL") {
       // Fetch current price
       try {
         const priceResponse = await getCurrentPrice(signal.code, authStatus.mode);
+        if (version !== selectionVersion.current) return;
         if (priceResponse.status === "success" && priceResponse.data) {
           setPriceData(priceResponse.data);
         } else {
@@ -139,6 +163,7 @@ export default function ExecutePage() {
             signal.code,
             priceResponse.data?.price || 0
           );
+          if (version !== selectionVersion.current) return;
           if (buyableResponse.status === "success" && buyableResponse.data) {
             setBuyableInfo(buyableResponse.data);
           } else {
@@ -147,12 +172,13 @@ export default function ExecutePage() {
           setSellableQty(null);
         } else {
           setBuyableInfo(null);
-          const holding = holdings.find((h) => h.stock_code === signal.code);
+          const holding = holdings.find((h) => h.stock_code === tickerOf(signal.code));
           setSellableQty(holding?.quantity ?? null);
         }
 
         setShowOrderModal(true);
       } catch {
+        if (version !== selectionVersion.current) return;
         setPriceData(null);
         setBuyableInfo(null);
         setSellableQty(null);
@@ -275,6 +301,22 @@ export default function ExecutePage() {
               />
             </div>
 
+            {selectedSignal && isUSInstrument(selectedSignal.code) && (
+              <div className="card p-6 space-y-2" aria-live="polite">
+                <h3 className="text-subheading">{selectedSignal.name} 시세</h3>
+                <p className="text-xs text-slate-500">{selectedSignal.code} · USD</p>
+                {quoteLoading ? <p>조회 중...</p> : quoteError ? (
+                  <p role="alert" className="text-red-500">{quoteError}</p>
+                ) : priceData && (
+                  <>
+                    <p className="text-2xl font-semibold">{priceData.price.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 })}</p>
+                    <p>전일 대비 {priceData.change.toLocaleString("en-US", { maximumFractionDigits: 4 })} USD ({priceData.change_rate.toFixed(2)}%)</p>
+                  </>
+                )}
+                <p className="text-xs text-slate-500">KIS 제공 시세이며 지연될 수 있습니다. 미국 주식 주문은 아직 지원하지 않습니다.</p>
+              </div>
+            )}
+
             {/* Execution Log */}
             {logs.length > 0 && (
               <ExecutionLog logs={logs} maxHeight="300px" />
@@ -283,6 +325,7 @@ export default function ExecutePage() {
 
           {/* Right Panel - Holdings */}
           <div className="lg:col-span-1">
+            <p className="text-xs text-slate-500 mb-2">국내 주식 잔고·미체결 주문</p>
             <HoldingsList
               holdings={holdings}
               pendingOrders={pendingOrders}

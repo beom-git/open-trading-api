@@ -190,7 +190,7 @@ def calc_strong_close_ratio(df: pd.DataFrame) -> Optional[float]:
     return (close - low) / (high - low)
 
 
-def calc_high_since(df: pd.DataFrame, days: int) -> Optional[int]:
+def calc_high_since(df: pd.DataFrame, days: int) -> Optional[float]:
     """
     N일간 최고가 조회
 
@@ -199,15 +199,15 @@ def calc_high_since(df: pd.DataFrame, days: int) -> Optional[int]:
         days: 조회 기간
 
     Returns:
-        최고가 (정수)
+        최고가 (소수점 유지)
     """
     if df.empty or len(df) < days:
         return None
 
-    return int(df["high"].tail(days).max())
+    return float(df["high"].tail(days).max())
 
 
-def calc_low_since(df: pd.DataFrame, days: int) -> Optional[int]:
+def calc_low_since(df: pd.DataFrame, days: int) -> Optional[float]:
     """
     N일간 최저가 조회
 
@@ -216,15 +216,15 @@ def calc_low_since(df: pd.DataFrame, days: int) -> Optional[int]:
         days: 조회 기간
 
     Returns:
-        최저가 (정수)
+        최저가 (소수점 유지)
     """
     if df.empty or len(df) < days:
         return None
 
-    return int(df["low"].tail(days).min())
+    return float(df["low"].tail(days).min())
 
 
-def get_latest_close(df: pd.DataFrame) -> Optional[int]:
+def get_latest_close(df: pd.DataFrame) -> Optional[float]:
     """
     최근 종가 조회
 
@@ -232,15 +232,15 @@ def get_latest_close(df: pd.DataFrame) -> Optional[int]:
         df: OHLCV DataFrame
 
     Returns:
-        종가 (정수)
+        종가 (소수점 유지)
     """
     if df.empty:
         return None
 
-    return int(df["close"].iloc[-1])
+    return float(df["close"].iloc[-1])
 
 
-def get_prev_close(df: pd.DataFrame) -> Optional[int]:
+def get_prev_close(df: pd.DataFrame) -> Optional[float]:
     """
     전일 종가 조회
 
@@ -248,12 +248,12 @@ def get_prev_close(df: pd.DataFrame) -> Optional[int]:
         df: OHLCV DataFrame
 
     Returns:
-        전일 종가 (정수)
+        전일 종가 (소수점 유지)
     """
     if df.empty or len(df) < 2:
         return None
 
-    return int(df["close"].iloc[-2])
+    return float(df["close"].iloc[-2])
 
 
 # =============================================================================

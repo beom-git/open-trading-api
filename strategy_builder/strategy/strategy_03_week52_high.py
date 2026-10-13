@@ -49,6 +49,7 @@ class Week52HighStrategy(BaseStrategy):
                 reason="현재가 조회 실패"
             )
 
+        unit = " USD" if price_info.get("currency") == "USD" else "원"
         current_price = price_info.get("price", 0)
         week52_high = price_info.get("w52_high", 0)
 
@@ -70,7 +71,7 @@ class Week52HighStrategy(BaseStrategy):
                 stock_name=stock_name,
                 action=Action.BUY,
                 strength=0.85,
-                reason=f"52주 신고가 돌파 ({week52_high:,}원 → {current_price:,}원)"
+                reason=f"52주 신고가 돌파 ({week52_high:,}{unit} → {current_price:,}{unit})"
             )
 
         # 52주 고가 대비 현재가 비율
@@ -81,6 +82,6 @@ class Week52HighStrategy(BaseStrategy):
             stock_name=stock_name,
             action=Action.HOLD,
             strength=0.0,
-            reason=f"52주 신고가 미도달 (현재: {current_price:,}원, 고가: {week52_high:,}원, {ratio:.1f}%)"
+            reason=f"52주 신고가 미도달 (현재: {current_price:,}{unit}, 고가: {week52_high:,}{unit}, {ratio:.1f}%)"
         )
 

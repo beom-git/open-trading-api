@@ -15,6 +15,7 @@ from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from core.instruments import require_domestic
 from core.order_executor import OrderExecutor
 from core.signal import Action, Signal
 from core.data_fetcher import get_deposit, get_holdings, get_pending_orders, cancel_order, clear_balance_cache
@@ -157,6 +158,8 @@ async def execute_order(request: OrderRequest):
         })
 
     try:
+        instrument = require_domestic(request.stock_code)
+        request = request.model_copy(update={"stock_code": instrument.ticker})
         # 1. 인증 확인
         if not is_authenticated():
             add_log("error", "인증이 필요합니다")

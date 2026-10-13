@@ -12,6 +12,8 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional
 
+from core.instruments import parse_instrument
+
 
 class Action(Enum):
     """매매 행동 구분"""
@@ -28,7 +30,7 @@ class Signal:
     skill: Signal 객체는 생성 후 변경 불가 (immutable)
 
     Attributes:
-        stock_code: 종목코드 (6자리)
+        stock_code: 공통 종목 ID (거래소:티커) 또는 이전 국내 코드
         stock_name: 종목명
         action: 매매 행동 (BUY/SELL/HOLD)
         strength: 시그널 강도 (0.0 ~ 1.0)
@@ -48,7 +50,7 @@ class Signal:
     strength: float
     reason: str
     timestamp: datetime = field(default_factory=datetime.now)
-    target_price: Optional[int] = None
+    target_price: Optional[float] = None
     quantity: Optional[int] = None
 
     def __post_init__(self):
@@ -56,8 +58,7 @@ class Signal:
         if not 0.0 <= self.strength <= 1.0:
             raise ValueError(f"strength must be between 0.0 and 1.0, got {self.strength}")
 
-        if len(self.stock_code) != 6:
-            raise ValueError(f"stock_code must be 6 digits, got {self.stock_code}")
+        parse_instrument(self.stock_code)
 
     def is_strong(self) -> bool:
         """강한 시그널 여부 (시장가 주문 대상)"""

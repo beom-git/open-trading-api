@@ -5,7 +5,7 @@
  */
 
 import { apiGet, apiPost } from "./client";
-import type { Symbol, SymbolSearchResponse, MasterStatus, CollectResult } from "@/types/symbols";
+import type { Exchange, Symbol, SymbolSearchResponse, MasterStatus, CollectResult } from "@/types/symbols";
 
 interface SymbolDetailResponse {
   status: string;
@@ -22,7 +22,7 @@ interface SymbolDetailResponse {
 export async function searchSymbols(
   query: string,
   limit: number = 20,
-  exchange?: "kospi" | "kosdaq"
+  exchange?: Exchange
 ): Promise<SymbolSearchResponse> {
   const params = new URLSearchParams({
     q: query,
@@ -39,7 +39,7 @@ export async function searchSymbols(
  */
 export async function getSymbolByCode(code: string): Promise<Symbol | null> {
   try {
-    const response = await apiGet<SymbolDetailResponse>(`/api/symbols/${code}`);
+    const response = await apiGet<SymbolDetailResponse>(`/api/symbols/${encodeURIComponent(code)}`);
     return response.data;
   } catch {
     return null;

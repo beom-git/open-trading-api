@@ -15,6 +15,7 @@ interface SettingsModalProps {
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const { status, isLoading, error, login, switchMode } = useAuth();
   const [masterStatus, setMasterStatus] = useState<MasterStatus | null>(null);
+  const [collectionError, setCollectionError] = useState("");
   const [isCollecting, setIsCollecting] = useState(false);
   const [cooldownTimer, setCooldownTimer] = useState(0);
 
@@ -52,14 +53,15 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   const handleCollectMaster = async () => {
     setIsCollecting(true);
+    setCollectionError("");
     try {
       const result = await collectMasterFiles();
       await fetchMasterStatus();
       if (!result.success && result.errors?.length) {
-        console.error("Collection errors:", result.errors);
+        setCollectionError(result.errors.join(" / "));
       }
     } catch (error) {
-      console.error("Failed to collect master files:", error);
+      setCollectionError("마스터파일 수집에 실패했습니다. 연결 상태를 확인해주세요.");
     } finally {
       setIsCollecting(false);
     }
@@ -232,14 +234,12 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               {masterStatus ? (
                 <>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">코스피</span>
-                      <span className="font-mono">{masterStatus.kospi_count.toLocaleString()}개</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-slate-600 dark:text-slate-400">코스닥</span>
-                      <span className="font-mono">{masterStatus.kosdaq_count.toLocaleString()}개</span>
-                    </div>
+                    {masterStatus.exchanges?.map((item) => (
+                      <div key={item.exchange} className="flex items-center justify-between">
+                        <span className="text-slate-600 dark:text-slate-400">{item.name}</span>
+                        <span className="font-mono">{item.count.toLocaleString()}개</span>
+                      </div>
+                    ))}
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-slate-600 dark:text-slate-400">총 종목 수</span>
@@ -261,6 +261,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   로딩 중...
                 </div>
               )}
+              {collectionError && <p role="alert" className="text-xs text-red-500">{collectionError}</p>}
               <button
                 onClick={handleCollectMaster}
                 disabled={isCollecting}

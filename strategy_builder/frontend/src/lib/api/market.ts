@@ -25,6 +25,8 @@ export interface OrderbookResponse {
 }
 
 export interface PriceData {
+  currency?: "KRW" | "USD";
+  exchange?: string;
   price: number;
   change: number;
   change_rate: number;
@@ -45,12 +47,12 @@ export async function getOrderbook(
   stockCode: string,
   envDv: string = "vps"
 ): Promise<OrderbookResponse> {
-  return apiGet<OrderbookResponse>(`/api/market/orderbook/${stockCode}?env_dv=${envDv}`);
+  return apiGet<OrderbookResponse>(`/api/market/orderbook/${encodeURIComponent(stockCode)}?env_dv=${envDv}`);
 }
 
 export async function getCurrentPrice(
   stockCode: string,
   envDv: string = "vps"
 ): Promise<PriceResponse> {
-  return apiGet<PriceResponse>(`/api/market/price/${stockCode}?env_dv=${envDv}`);
+  return apiGet<PriceResponse>(`/api/market/price/${encodeURIComponent(stockCode)}?env_dv=${envDv}`);
 }
