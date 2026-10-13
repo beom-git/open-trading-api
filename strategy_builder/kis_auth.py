@@ -422,7 +422,7 @@ class APIRespError(APIResp):
 
 
 def _url_fetch(
-        api_url, ptr_id, tr_cont, params, appendHeaders=None, postFlag=False, hashFlag=True
+        api_url, ptr_id, tr_cont, params, appendHeaders=None, postFlag=False, hashFlag=True, timeout=None
 ):
     global _last_api_call_time
 
@@ -464,7 +464,7 @@ def _url_fetch(
 
     if postFlag:
         # if (hashFlag): set_order_hash_key(headers, params)
-        res = requests.post(url, headers=headers, data=json.dumps(params))
+        res = requests.post(url, headers=headers, data=json.dumps(params), timeout=timeout)
     else:
         res = requests.get(url, headers=headers, params=params, timeout=30)
 

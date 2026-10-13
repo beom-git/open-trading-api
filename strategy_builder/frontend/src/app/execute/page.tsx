@@ -1,5 +1,6 @@
 "use client";
 
+import { USPaperPanel } from "@/components/execute/USPaperPanel";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Play, Loader2, Zap } from "lucide-react";
 import {
@@ -321,7 +322,8 @@ export default function ExecutePage() {
                     {displayCurrency === "KRW" && !showKrw && <p className="text-xs text-amber-600">환율을 확인할 수 없어 달러로 표시합니다.</p>}
                   </>
                 )}
-                <p className="text-xs text-slate-500">KIS 제공 시세이며 지연될 수 있습니다. 미국 주식 주문은 아직 지원하지 않습니다.</p>
+                <p className="text-xs text-slate-500">KIS 제공 시세이며 지연될 수 있습니다. 미국 주문은 모의 모드에서만 가능합니다.</p>
+                <USPaperPanel instrumentId={selectedSignal.code} currentPrice={priceData?.price}/>
               </div>
             )}
 

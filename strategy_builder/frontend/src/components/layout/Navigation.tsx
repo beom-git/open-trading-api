@@ -9,6 +9,7 @@ import { ExchangeRateTicker } from "./ExchangeRateTicker";
 import { SettingsModal } from "@/components/settings";
 
 const navItems = [
+  { href: "/paper", label: "미국 모의투자", icon: Play },
   { href: "/backtest", label: "미국 백테스트", icon: TrendingUp },
   { href: "/builder", label: "전략 빌더", icon: Sparkles },
   { href: "/execute", label: "전략 실행", icon: Play },
