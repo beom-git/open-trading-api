@@ -25,6 +25,8 @@ export interface OrderbookResponse {
 }
 
 export interface PriceData {
+  currency?: "KRW" | "USD";
+  exchange?: string;
   price: number;
   change: number;
   change_rate: number;
@@ -45,12 +47,34 @@ export async function getOrderbook(
   stockCode: string,
   envDv: string = "vps"
 ): Promise<OrderbookResponse> {
-  return apiGet<OrderbookResponse>(`/api/market/orderbook/${stockCode}?env_dv=${envDv}`);
+  return apiGet<OrderbookResponse>(`/api/market/orderbook/${encodeURIComponent(stockCode)}?env_dv=${envDv}`);
 }
 
 export async function getCurrentPrice(
   stockCode: string,
   envDv: string = "vps"
 ): Promise<PriceResponse> {
-  return apiGet<PriceResponse>(`/api/market/price/${stockCode}?env_dv=${envDv}`);
+  return apiGet<PriceResponse>(`/api/market/price/${encodeURIComponent(stockCode)}?env_dv=${envDv}`);
+}
+
+export interface ExchangeRate {
+  base: "USD";
+  quote: "KRW";
+  rate: number;
+  source: string;
+  symbol: string;
+  source_quote_time: string | null;
+  fetched_at: string;
+}
+
+export interface ExchangeRateResponse {
+  status: "success" | "error";
+  data: ExchangeRate | null;
+  stale: boolean;
+  message: string | null;
+  refresh_interval_seconds: number;
+}
+
+export function getExchangeRate(signal?: AbortSignal): Promise<ExchangeRateResponse> {
+  return apiGet<ExchangeRateResponse>("/api/market/exchange-rate", signal);
 }

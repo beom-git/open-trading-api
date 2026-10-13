@@ -7,12 +7,23 @@ import logging
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
 from core import data_fetcher
+from core.instruments import require_domestic
+from core.exchange_rates import get_usd_krw
 from core.websocket_manager import get_ws_manager
-from backend import authenticate, is_authenticated
+from backend import authenticate, is_authenticated, get_current_mode
 
 logging.basicConfig(level=logging.INFO)
 
 router = APIRouter()
+
+
+@router.get("/exchange-rate")
+def get_exchange_rate():
+    """Polling must not log in or change trading mode as a side effect."""
+    if not is_authenticated():
+        return {"status": "error", "data": None, "stale": False,
+                "message": "환율 조회는 KIS 인증 후 이용할 수 있습니다", "refresh_interval_seconds": 30}
+    return get_usd_krw(get_current_mode())
 
 
 def ensure_authenticated(env_dv: str = "vps") -> bool:
@@ -23,7 +34,7 @@ def ensure_authenticated(env_dv: str = "vps") -> bool:
     return authenticate(env_dv)
 
 
-@router.get("/orderbook/{stock_code}")
+@router.get("/orderbook/{stock_code:path}")
 async def get_orderbook(
     stock_code: str,
     env_dv: str = Query("demo", description="환경 구분 (real/demo/prod/vps)")
@@ -82,7 +93,7 @@ async def get_orderbook(
         }
 
 
-@router.get("/price/{stock_code}")
+@router.get("/price/{stock_code:path}")
 async def get_current_price(
     stock_code: str,
     env_dv: str = Query("demo", description="환경 구분 (real/demo/prod/vps)")
@@ -138,7 +149,7 @@ async def get_current_price(
         }
 
 
-@router.websocket("/ws/{stock_code}")
+@router.websocket("/ws/{stock_code:path}")
 async def websocket_orderbook(websocket: WebSocket, stock_code: str):
     """
     실시간 호가 웹소켓
@@ -163,6 +174,11 @@ async def websocket_orderbook(websocket: WebSocket, stock_code: str):
         }
     """
     await websocket.accept()
+    try:
+        stock_code = require_domestic(stock_code).ticker
+    except ValueError:
+        await websocket.close(code=1008, reason="Domestic orderbook only")
+        return
     logging.info(f"WebSocket 연결: {stock_code}")
 
     ws_manager = get_ws_manager()

@@ -466,7 +466,7 @@ def _url_fetch(
         # if (hashFlag): set_order_hash_key(headers, params)
         res = requests.post(url, headers=headers, data=json.dumps(params))
     else:
-        res = requests.get(url, headers=headers, params=params)
+        res = requests.get(url, headers=headers, params=params, timeout=30)
 
     if res.status_code == 200:
         ar = APIResp(res)

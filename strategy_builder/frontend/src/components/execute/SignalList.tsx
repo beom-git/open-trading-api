@@ -90,6 +90,9 @@ export function SignalList({ signals, onSelect, selectedCode }: SignalListProps)
                 <span className="text-xs text-slate-400 font-mono">{signal.code}</span>
               </div>
               <p className="text-sm text-slate-500 line-clamp-1">{signal.reason}</p>
+              {signal.order_supported === false && signal.action !== "ERROR" && (
+                <p className="text-xs text-slate-500">{signal.currency} · 시세 조회 가능 · 주문 미지원</p>
+              )}
             </div>
 
             {/* Strength - 임시 비활성화 */}

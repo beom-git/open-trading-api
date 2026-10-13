@@ -3,7 +3,8 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { X, Search, Loader2 } from "lucide-react";
 import { searchSymbols, getSymbolByCode } from "@/lib/api/symbols";
-import type { Symbol } from "@/types/symbols";
+import { isInstrumentId, sameInstrument, tickerOf } from "@/lib/instruments";
+import type { Exchange, Symbol } from "@/types/symbols";
 
 const STORAGE_KEY = "kis_selected_stocks";
 
@@ -18,9 +19,12 @@ interface StockInputProps {
 }
 
 // 빠른 선택용 코드 목록 (이름은 마스터파일에서 조회)
-const POPULAR_CODES = ["005930", "000660", "035720", "005380", "051910", "035420"];
+const POPULAR_CODES = ["005930", "000660", "035720", "005380", "051910", "035420", "NASDAQ:AAPL", "NASDAQ:MSFT", "AMEX:SPY"];
 
 export function StockInput({ stocks, onChange }: StockInputProps) {
+  const [exchange, setExchange] = useState<Exchange | "">("");
+  const [searchError, setSearchError] = useState("");
+  const searchVersion = useRef(0);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Symbol[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -131,7 +135,10 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
 
   // Debounced search
   const doSearch = useCallback(async (searchQuery: string) => {
+    const version = ++searchVersion.current;
+    setSearchError("");
     if (!searchQuery.trim()) {
+      setIsLoading(false);
       setResults([]);
       setIsOpen(false);
       return;
@@ -139,18 +146,23 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
 
     setIsLoading(true);
     try {
-      const response = await searchSymbols(searchQuery, 8);
+      const response = await searchSymbols(searchQuery, 8, exchange || undefined);
+      if (version !== searchVersion.current) return;
       setResults(response.items);
       setIsOpen(response.items.length > 0);
       setHighlightIndex(-1);
     } catch {
+      if (version !== searchVersion.current) return;
       setResults([]);
+      setIsOpen(false);
+      setSearchError("종목 검색에 실패했습니다. 백엔드 연결을 확인해주세요.");
     } finally {
-      setIsLoading(false);
+      if (version === searchVersion.current) setIsLoading(false);
     }
-  }, []);
+  }, [exchange]);
 
   useEffect(() => {
+    searchVersion.current++;
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
     }
@@ -185,11 +197,11 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
 
   const handleSelect = useCallback(
     (symbol: Symbol) => {
-      if (!stocks.includes(symbol.code)) {
-        onChange([...stocks, symbol.code]);
+      if (!stocks.some((code) => sameInstrument(code, symbol.id))) {
+        onChange([...stocks, symbol.id]);
         setStockNames((prev) => ({
           ...prev,
-          [symbol.code]: symbol.name,
+          [symbol.id]: symbol.name,
         }));
       }
       setQuery("");
@@ -201,8 +213,8 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
 
   const addStockByCode = useCallback(
     async (code: string, name?: string) => {
-      const trimmed = code.trim();
-      if (trimmed.length === 6 && /^\d+$/.test(trimmed) && !stocks.includes(trimmed)) {
+      const trimmed = code.trim().toUpperCase();
+      if (isInstrumentId(trimmed) && !stocks.some((stock) => sameInstrument(stock, trimmed))) {
         onChange([...stocks, trimmed]);
         if (name) {
           setStockNames((prev) => ({
@@ -252,7 +264,7 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
           e.preventDefault();
           if (highlightIndex >= 0 && highlightIndex < results.length) {
             handleSelect(results[highlightIndex]);
-          } else if (query.length === 6 && /^\d+$/.test(query)) {
+          } else if (isInstrumentId(query.trim().toUpperCase())) {
             addStockByCode(query);
           }
           break;
@@ -260,7 +272,7 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
           setIsOpen(false);
           break;
       }
-    } else if (e.key === "Enter" && query.length === 6 && /^\d+$/.test(query)) {
+    } else if (e.key === "Enter" && isInstrumentId(query.trim().toUpperCase())) {
       e.preventDefault();
       addStockByCode(query);
     }
@@ -268,16 +280,21 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
 
   const handlePaste = useCallback(
     (e: React.ClipboardEvent) => {
-      e.preventDefault();
       const pastedText = e.clipboardData.getData("text");
       const codes = pastedText
         .split(/[,\s]+/)
-        .filter((c) => c.trim().length === 6 && /^\d+$/.test(c.trim()))
-        .map((c) => c.trim());
-      const newCodes = codes.filter((c) => !stocks.includes(c));
+        .map((c) => c.trim().toUpperCase())
+        .filter(Boolean);
+      // Names and bare tickers use normal paste -> search, never silently discard text.
+      if (!codes.length || !codes.every(isInstrumentId)) return;
+      e.preventDefault();
+      const newCodes = codes.filter((c) => !stocks.some((stock) => sameInstrument(stock, c)));
       if (newCodes.length === 0) return;
 
-      const uniqueCodes = [...new Set([...stocks, ...newCodes])];
+      const uniqueCodes = [...stocks];
+      for (const code of newCodes) {
+        if (!uniqueCodes.some((existing) => sameInstrument(existing, code))) uniqueCodes.push(code);
+      }
       onChange(uniqueCodes);
 
       // 붙여넣기한 종목 이름 조회
@@ -300,6 +317,22 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
         종목 검색
       </label>
 
+      <select
+        aria-label="거래소 필터"
+        value={exchange}
+        onChange={(event) => setExchange(event.target.value as Exchange | "")}
+        className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900"
+      >
+        <option value="">전체 거래소</option>
+        <option value="kospi">코스피</option>
+        <option value="kosdaq">코스닥</option>
+        <option value="nasdaq">나스닥</option>
+        <option value="nyse">뉴욕</option>
+        <option value="amex">아멕스</option>
+      </select>
+      <p className="text-xs text-slate-500">미국 종목은 설정에서 마스터파일 수집 후 검색하세요. 시세·시그널을 지원하며 주문은 준비 중입니다.</p>
+      {searchError && <p role="alert" className="text-sm text-red-500">{searchError}</p>}
+
       {/* Search Input with Autocomplete */}
       <div className="relative">
         <div className="relative">
@@ -312,7 +345,7 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
             onKeyDown={handleKeyDown}
             onPaste={handlePaste}
             onFocus={() => query && results.length > 0 && setIsOpen(true)}
-            placeholder="종목명 또는 코드 검색 (예: 삼성전자, 005930)"
+            placeholder="종목명·티커 검색 (삼성전자, AAPL, 애플)"
             className="w-full pl-10 pr-10 py-3 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary focus:border-transparent"
           />
           {query && !isLoading && (
@@ -342,16 +375,16 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
           >
             {results.map((symbol, index) => (
               <button
-                key={symbol.code}
+                key={symbol.id}
                 onClick={() => handleSelect(symbol)}
                 className={`w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors ${
                   index === highlightIndex ? "bg-slate-100 dark:bg-slate-800" : ""
-                } ${stocks.includes(symbol.code) ? "opacity-50" : ""}`}
-                disabled={stocks.includes(symbol.code)}
+                } ${stocks.some((code) => sameInstrument(code, symbol.id)) ? "opacity-50" : ""}`}
+                disabled={stocks.some((code) => sameInstrument(code, symbol.id))}
               >
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-sm font-medium text-slate-700 dark:text-slate-300 w-16">
-                    {symbol.code}
+                  <span className="font-mono text-sm font-medium text-slate-700 dark:text-slate-300 min-w-16">
+                    {symbol.ticker}
                   </span>
                   <span className="text-sm text-slate-900 dark:text-white">
                     {symbol.name}
@@ -372,6 +405,10 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
         )}
       </div>
 
+      {query.trim() && !isLoading && !searchError && results.length === 0 && (
+        <p className="text-xs text-slate-500">검색 결과가 없습니다. 거래소 필터와 마스터파일 수집 상태를 확인해주세요.</p>
+      )}
+
       {/* Selected Stocks */}
       {stocks.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -382,7 +419,8 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
                 key={code}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-primary/10 text-primary rounded-full text-sm"
               >
-                <span className="font-mono font-medium">{code}</span>
+                <span className="font-mono font-medium">{tickerOf(code)}</span>
+                {code.includes(":") && <span className="text-xs">{code.split(":")[0]}</span>}
                 {name && <span className="text-primary/70">{name}</span>}
                 <button
                   onClick={() => removeStock(code)}
@@ -402,7 +440,7 @@ export function StockInput({ stocks, onChange }: StockInputProps) {
         <div className="pt-2">
           <p className="text-xs text-slate-500 mb-2">빠른 선택</p>
           <div className="flex flex-wrap gap-2">
-            {popularStocks.filter((s) => !stocks.includes(s.code)).map((stock) => (
+            {popularStocks.filter((s) => !stocks.some((code) => sameInstrument(code, s.code))).map((stock) => (
               <button
                 key={stock.code}
                 onClick={() => addStockByCode(stock.code, stock.name)}

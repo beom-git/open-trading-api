@@ -16,6 +16,8 @@ import os
 import tempfile
 from typing import Any, Callable, Dict, List
 
+from core.instruments import parse_instrument
+
 from strategy_core.dsl.converter import builder_state_to_dsl
 from strategy_core.dsl.parser import parse_strategy
 from strategy_core.dsl.codegen import StrategyCodeGenerator
@@ -178,7 +180,10 @@ def _run_strategy_on_stocks(
         name = get_stock_name(code)
         log("info", f"분석 중: {name} ({code})")
 
+        instrument = None
         try:
+            instrument = parse_instrument(code)
+            code = instrument.code
             signal = strategy.generate_signal(code, name)
             result = {
                 'code': code,
@@ -187,6 +192,9 @@ def _run_strategy_on_stocks(
                 'strength': signal.strength,
                 'reason': signal.reason,
                 'target_price': getattr(signal, 'target_price', None),
+                'currency': instrument.currency,
+                'exchange': instrument.exchange,
+                'order_supported': not instrument.is_overseas,
             }
             results.append(result)
 
@@ -205,6 +213,9 @@ def _run_strategy_on_stocks(
                 'strength': 0,
                 'reason': str(e),
                 'target_price': None,
+                'order_supported': False,
+                'currency': instrument.currency if instrument else 'KRW',
+                'exchange': instrument.exchange if instrument else '',
             })
 
         api_sleep()

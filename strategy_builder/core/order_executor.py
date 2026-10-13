@@ -9,11 +9,13 @@ Applied Skills: skills/investment-strategy-framework.md
 
 import logging
 import math
+from dataclasses import replace
 
 import pandas as pd
 
 import kis_auth as ka
 from core import data_fetcher
+from core.instruments import require_domestic
 from core.position_manager import PositionManager
 from core.risk_manager import RiskManager
 from core.signal import Action, Signal
@@ -57,6 +59,9 @@ class OrderExecutor:
             5. 주문 파라미터 결정
             6. order_cash() 호출
         """
+        instrument = require_domestic(signal.stock_code)
+        signal = replace(signal, stock_code=instrument.ticker)
+
         # 1. HOLD 시그널 무시
         if signal.action == Action.HOLD:
             logging.info(f"HOLD 시그널 - 주문 생략: {signal.stock_name}")

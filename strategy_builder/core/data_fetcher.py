@@ -14,6 +14,8 @@ from datetime import datetime, timedelta
 import pandas as pd
 
 import kis_auth as ka
+from core.instruments import parse_instrument, require_domestic
+from core import overseas_data
 
 logging.basicConfig(level=logging.INFO)
 
@@ -139,6 +141,13 @@ def get_daily_prices(
     Note:
         skill: API 실패 시 빈 DataFrame 반환
     """
+    instrument = parse_instrument(stock_code)
+    if instrument.is_overseas:
+        if not _assert_trenv_ready(f"일봉 조회 {stock_code}"):
+            raise RuntimeError("KIS API 인증이 필요합니다")
+        return overseas_data.get_daily_prices(instrument, days)
+    stock_code = instrument.ticker
+
     if not _assert_trenv_ready(f"일봉 조회 {stock_code}"):
         return pd.DataFrame()
 
@@ -230,6 +239,13 @@ def get_current_price(
     Note:
         skill: API 실패 시 빈 dict 반환
     """
+    instrument = parse_instrument(stock_code)
+    if instrument.is_overseas:
+        if not _assert_trenv_ready(f"현재가 조회 {stock_code}"):
+            raise RuntimeError("KIS API 인증이 필요합니다")
+        return overseas_data.get_current_price(instrument)
+    stock_code = instrument.ticker
+
     if not _assert_trenv_ready(f"현재가 조회 {stock_code}"):
         return {}
 
@@ -357,6 +373,8 @@ def get_buyable_amount(
         - amount: 매수가능금액 (미수 미사용)
         - quantity: 매수가능수량 (미수 미사용)
     """
+    stock_code = require_domestic(stock_code).ticker
+
     if not _assert_trenv_ready(f"매수가능 조회 {stock_code}"):
         return {"amount": 0, "quantity": 0}
 
@@ -483,6 +501,8 @@ def get_orderbook(
     Note:
         skill: API 실패 시 빈 dict 반환
     """
+    stock_code = require_domestic(stock_code).ticker
+
     if not _assert_trenv_ready(f"호가 조회 {stock_code}"):
         return {}
 
@@ -663,6 +683,8 @@ def cancel_order(
     Note:
         skill: API 실패 시 success=False 반환
     """
+    stock_code = require_domestic(stock_code).ticker
+
     if not _assert_trenv_ready(f"주문 취소 {order_no}"):
         return {"success": False, "order_no": order_no, "message": "재인증이 필요합니다"}
 

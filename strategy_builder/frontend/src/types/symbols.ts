@@ -4,10 +4,17 @@
  * Stock Master File Management System
  */
 
+export type Exchange = "kospi" | "kosdaq" | "nasdaq" | "nyse" | "amex";
+
 export interface Symbol {
+  id: string;
+  ticker: string;
+  market: "KR" | "US";
+  currency: "KRW" | "USD";
+  english_name: string;
   code: string;
   name: string;
-  exchange: "kospi" | "kosdaq";
+  exchange: Exchange;
   exchange_name: string;
 }
 
@@ -18,6 +25,7 @@ export interface SymbolSearchResponse {
 }
 
 export interface MasterStatus {
+  exchanges: { exchange: Exchange; name: string; count: number; updated_at: string | null }[];
   kospi_count: number;
   kosdaq_count: number;
   total_count: number;
