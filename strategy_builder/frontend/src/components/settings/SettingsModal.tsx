@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { X, RefreshCw, Database, Shield, Clock } from "lucide-react";
+import { formatKstDateTime } from "@/lib/currency";
+import { useCurrency, type DisplayCurrency } from "@/contexts/CurrencyContext";
 import { useAuth } from "@/hooks";
 import { getMasterStatus, collectMasterFiles } from "@/lib/api/symbols";
 import type { MasterStatus } from "@/types/symbols";
@@ -13,6 +15,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
+  const { displayCurrency, setDisplayCurrency, exchangeRate, usableRate } = useCurrency();
   const { status, isLoading, error, login, switchMode } = useAuth();
   const [masterStatus, setMasterStatus] = useState<MasterStatus | null>(null);
   const [collectionError, setCollectionError] = useState("");
@@ -93,12 +96,13 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
       />
 
       {/* Modal */}
-      <div className="relative w-full max-w-md mx-4 bg-white dark:bg-slate-900 rounded-xl shadow-2xl">
+      <div className="relative w-full max-w-md max-h-[90vh] overflow-y-auto mx-4 bg-white dark:bg-slate-900 rounded-xl shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 dark:border-slate-700">
           <h2 className="text-lg font-semibold">설정</h2>
           <button
             onClick={onClose}
+            aria-label="설정 닫기"
             className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="w-5 h-5" />
@@ -107,6 +111,23 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
         {/* Content */}
         <div className="p-4 space-y-6">
+          <section className="space-y-3">
+            <label htmlFor="display-currency" className="text-sm font-medium text-slate-700 dark:text-slate-300">해외 시세 표시 통화</label>
+            <select id="display-currency" value={displayCurrency}
+              onChange={(event) => setDisplayCurrency(event.target.value as DisplayCurrency)}
+              className="w-full px-3 py-2 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900">
+              <option value="USD">USD · 달러</option>
+              <option value="KRW">KRW · 원화 환산</option>
+            </select>
+            <p className="text-xs text-slate-500">미국 주식 시세와 전일 대비 금액에 적용되며, 이 브라우저에 저장됩니다.</p>
+            <p className="text-xs text-slate-500">
+              {usableRate !== null ? `적용 환율: 1 USD = ${usableRate.toLocaleString("ko-KR", { maximumFractionDigits: 2 })} KRW (KIS)` : "유효한 환율이 없으면 달러로 표시합니다."}
+            </p>
+            {exchangeRate && <p className="text-xs text-slate-500">마지막 조회 성공: {formatKstDateTime(exchangeRate.fetched_at)}</p>}
+            {exchangeRate?.source_quote_time && <p className="text-xs text-slate-500">KIS 제공 시각: {exchangeRate.source_quote_time.replace("T", " ")}</p>}
+            <p className="text-xs text-slate-500">환율은 30초마다 조회하며 휴장·제공 지연 시 마지막 시세일 수 있습니다. 실제 환전 금액에는 환전 수수료 등이 반영됩니다.</p>
+          </section>
+
           {/* Authentication & Mode Section */}
           <section className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-300">

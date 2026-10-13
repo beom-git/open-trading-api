@@ -22,6 +22,7 @@ import {
   type PendingOrder,
   type CancelOrderRequest,
 } from "@/lib/api";
+import { useCurrency } from "@/contexts/CurrencyContext";
 import { isUSInstrument, tickerOf } from "@/lib/instruments";
 import type { SignalResult } from "@/types/signal";
 import type { OrderRequest, OrderResult } from "@/types/order";
@@ -29,6 +30,11 @@ import type { BuyableInfo } from "@/types/account";
 
 export default function ExecutePage() {
   const { status: authStatus } = useAuth();
+  const { displayCurrency, usableRate } = useCurrency();
+  const showKrw = displayCurrency === "KRW" && usableRate !== null;
+  const formatQuoteAmount = (usd: number) => (showKrw ? usd * usableRate! : usd).toLocaleString(showKrw ? "ko-KR" : "en-US", {
+    style: "currency", currency: showKrw ? "KRW" : "USD", maximumFractionDigits: showKrw ? 0 : 4,
+  });
   const { holdings, balance, fetchHoldings, fetchBalance, resetThrottle, isLoading: accountLoading } = useAccount();
   const {
     strategies,
@@ -304,13 +310,15 @@ export default function ExecutePage() {
             {selectedSignal && isUSInstrument(selectedSignal.code) && (
               <div className="card p-6 space-y-2" aria-live="polite">
                 <h3 className="text-subheading">{selectedSignal.name} 시세</h3>
-                <p className="text-xs text-slate-500">{selectedSignal.code} · USD</p>
+                <p className="text-xs text-slate-500">{selectedSignal.code} · {showKrw ? "KRW 환산" : "USD"}</p>
                 {quoteLoading ? <p>조회 중...</p> : quoteError ? (
                   <p role="alert" className="text-red-500">{quoteError}</p>
                 ) : priceData && (
                   <>
-                    <p className="text-2xl font-semibold">{priceData.price.toLocaleString("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 4 })}</p>
-                    <p>전일 대비 {priceData.change.toLocaleString("en-US", { maximumFractionDigits: 4 })} USD ({priceData.change_rate.toFixed(2)}%)</p>
+                    <p className="text-2xl font-semibold">{formatQuoteAmount(priceData.price)}</p>
+                    <p>전일 대비{showKrw ? " (동일 환율 환산)" : ""} {formatQuoteAmount(priceData.change)} ({priceData.change_rate.toFixed(2)}%)</p>
+                    {showKrw && <p className="text-xs text-slate-500">원 시세 {priceData.price.toLocaleString("en-US", { maximumFractionDigits: 4 })} USD · 적용 환율 {usableRate?.toLocaleString("ko-KR", { maximumFractionDigits: 2 })}원</p>}
+                    {displayCurrency === "KRW" && !showKrw && <p className="text-xs text-amber-600">환율을 확인할 수 없어 달러로 표시합니다.</p>}
                   </>
                 )}
                 <p className="text-xs text-slate-500">KIS 제공 시세이며 지연될 수 있습니다. 미국 주식 주문은 아직 지원하지 않습니다.</p>

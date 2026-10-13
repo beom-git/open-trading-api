@@ -36,9 +36,11 @@ async function handleResponse<T>(response: Response): Promise<T> {
   return response.json();
 }
 
-export async function apiGet<T>(path: string): Promise<T> {
+export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "GET",
+    signal,
+    cache: "no-store",
     headers: {
       "Content-Type": "application/json",
     },

@@ -8,12 +8,22 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query
 
 from core import data_fetcher
 from core.instruments import require_domestic
+from core.exchange_rates import get_usd_krw
 from core.websocket_manager import get_ws_manager
-from backend import authenticate, is_authenticated
+from backend import authenticate, is_authenticated, get_current_mode
 
 logging.basicConfig(level=logging.INFO)
 
 router = APIRouter()
+
+
+@router.get("/exchange-rate")
+def get_exchange_rate():
+    """Polling must not log in or change trading mode as a side effect."""
+    if not is_authenticated():
+        return {"status": "error", "data": None, "stale": False,
+                "message": "환율 조회는 KIS 인증 후 이용할 수 있습니다", "refresh_interval_seconds": 30}
+    return get_usd_krw(get_current_mode())
 
 
 def ensure_authenticated(env_dv: str = "vps") -> bool:

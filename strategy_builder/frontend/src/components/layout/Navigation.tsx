@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { TrendingUp, Sparkles, Play, Settings } from "lucide-react";
 import { useAuth } from "@/hooks";
+import { ExchangeRateTicker } from "./ExchangeRateTicker";
 import { SettingsModal } from "@/components/settings";
 
 const navItems = [
@@ -90,6 +91,7 @@ export function Navigation() {
               </button>
             </div>
           </div>
+          <ExchangeRateTicker />
         </div>
       </header>
 
