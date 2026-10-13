@@ -10,6 +10,9 @@ echo "Frontend: http://localhost:3000"
 echo "Backend:  http://localhost:8000"
 echo ""
 
+# Check the lockfile dependencies before starting or stopping any services.
+(cd "$SCRIPT_DIR/frontend" && npm run deps:check) || exit 1
+
 # Kill existing processes on these ports
 lsof -ti:3000 | xargs kill -9 2>/dev/null
 lsof -ti:8000 | xargs kill -9 2>/dev/null
@@ -22,12 +25,6 @@ BACKEND_PID=$!
 
 # Wait for backend
 sleep 2
-
-# Ensure frontend deps are installed
-if [ ! -d "$SCRIPT_DIR/frontend/node_modules" ]; then
-  echo "[Frontend] node_modules not found, running npm install..."
-  (cd "$SCRIPT_DIR/frontend" && npm install) || { echo "npm install failed. Run: cd frontend && npm install"; exit 1; }
-fi
 
 # Start frontend
 cd "$SCRIPT_DIR/frontend"

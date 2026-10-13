@@ -6,7 +6,11 @@
     "dev": "next dev --hostname 127.0.0.1 -p 3000",
     "build": "next build",
     "start": "next start --hostname 127.0.0.1 -p 3000",
-    "lint": "eslint"
+    "lint": "eslint",
+    "deps:check": "node scripts/ensure-dependencies.cjs",
+    "predev": "npm run deps:check",
+    "prebuild": "npm run deps:check",
+    "prestart": "npm run deps:check"
   },
   "dependencies": {
     "clsx": "^2.1.1",
