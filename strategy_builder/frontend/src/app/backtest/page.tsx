@@ -20,7 +20,7 @@ export default function BacktestPage() {
   const [cash,setCash]=useState(10000),[fee,setFee]=useState(.001),[slip,setSlip]=useState(.001);
   const [result,setResult]=useState<Result|null>(null),[selected,setSelected]=useState(0),[busy,setBusy]=useState(false),[error,setError]=useState("");
   const [from,setFrom]=useState(0),[to,setTo]=useState(0);
-  useEffect(()=>{apiGet<{strategies:typeof strategies}>("/api/strategies").then(r=>setStrategies(r.strategies)).catch(e=>setError(String(e)));},[]);
+  useEffect(()=>{const q=new URLSearchParams(window.location.search);if(q.get("instrument_id"))setId(q.get("instrument_id")!);if(q.get("strategy_id"))setStrategy(q.get("strategy_id")!);apiGet<{strategies:typeof strategies}>("/api/strategies").then(r=>setStrategies(r.strategies)).catch(e=>setError(String(e)));},[]);
   const choices=[...strategies,...local.strategies.map(s=>({id:`local_${s.id}`,name:s.name,builder_state:s.state}))];
   async function run() {
     setBusy(true);setError("");setResult(null);

@@ -55,6 +55,18 @@ _smartSleep = 0.1
 
 # Rate Limiter: 모든 REST API 호출을 직렬화하여 초당 제한 준수
 import threading
+from functools import wraps
+
+trading_context_lock = threading.RLock()
+
+def with_trading_context(function):
+    """Keep account, token, domain and mode consistent across an API request."""
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        with trading_context_lock:
+            return function(*args, **kwargs)
+    return wrapped
+
 
 _rate_lock = threading.Lock()
 _last_api_call_time = 0.0
@@ -140,11 +152,12 @@ def isPaperTrading():  # 모의투자 매매
 
 
 # 실전투자면 'prod', 모의투자면 'vps'를 셋팅 하시기 바랍니다.
+@with_trading_context
 def changeTREnv(token_key, svr="prod", product=None):
     product = _cfg["my_prod"] if product is None else product
     cfg = dict()
 
-    global _isPaper
+    global _isPaper, _smartSleep
     if svr == "prod":  # 실전투자
         ak1 = "my_app"  # 실전투자용 앱키
         ak2 = "my_sec"  # 실전투자용 앱시크리트
@@ -197,6 +210,7 @@ def _getResultObject(json_data):
 
 # Token 발급, 유효기간 1일, 6시간 이내 발급시 기존 token값 유지, 발급시 알림톡 무조건 발송
 # 모의투자인 경우  svr='vps', 투자계좌(01)이 아닌경우 product='XX' 변경하세요 (계좌번호 뒤 2자리)
+@with_trading_context
 def auth(svr="prod", product=None, url=None):
     product = _cfg["my_prod"] if product is None else product
     p = {
@@ -421,6 +435,7 @@ class APIRespError(APIResp):
 ########### API call wrapping : API 호출 공통
 
 
+@with_trading_context
 def _url_fetch(
         api_url, ptr_id, tr_cont, params, appendHeaders=None, postFlag=False, hashFlag=True, timeout=None
 ):

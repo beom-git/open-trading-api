@@ -15,13 +15,13 @@ const assert=require('node:assert/strict');
   if(path==='/api/backtest'){submitted=route.request().postDataJSON();body=result;}
   await route.fulfill({json:body});
  });
- await page.goto((process.env.APP_URL||'http://127.0.0.1:3100')+'/backtest');
+ await page.goto((process.env.APP_URL||'http://127.0.0.1:3100')+'/backtest?instrument_id=NYSE%3ABRK%2FB&strategy_id=fixture');
  await page.getByLabel('전략',{exact:true}).selectOption('fixture');
  await page.getByLabel('시작일',{exact:true}).fill('2025-01-02');
  await page.getByLabel('종료일',{exact:true}).fill('2025-01-06');
  await page.getByRole('button',{name:'백테스트 실행',exact:true}).click();
  await page.getByText('총수익률 20.43%',{exact:false}).waitFor();
- assert.equal(submitted.instrument_id,'NASDAQ:AAPL');
+ assert.equal(submitted.instrument_id,'NYSE:BRK/B');
  assert.equal(submitted.initial_cash,10000);
  await page.getByRole('button',{name:'20250103 10.25',exact:true}).click();
  assert.match(await page.getByRole('region',{name:'매매 근거'}).innerText(),/close 10 > ma\(2\) 9.5 → 충족/);

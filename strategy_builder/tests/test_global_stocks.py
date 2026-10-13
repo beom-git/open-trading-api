@@ -174,7 +174,7 @@ class MarketAndExecutionTests(unittest.TestCase):
             result = response.json()['results'][0]
             self.assertNotEqual(result['action'], 'ERROR', result['reason'])
             self.assertEqual(result['currency'], 'USD')
-            self.assertFalse(result['order_supported'])
+            self.assertTrue(result['order_supported'])
 
     def test_custom_file_execution(self):
         code = StrategyCodeGenerator().generate(parse_strategy(name='test_global', name_ko='Global', buy_condition='close > open', sell_condition='close < open'))
@@ -214,7 +214,7 @@ class MarketAndExecutionTests(unittest.TestCase):
                 for result in response['results']:
                     self.assertNotEqual(result['action'], 'ERROR', result['reason'])
                 self.assertTrue(response['results'][0]['order_supported'])
-                self.assertFalse(response['results'][1]['order_supported'])
+                self.assertTrue(response['results'][1]['order_supported'])
 
     def test_broker_failure_is_error_signal(self):
         failure = SimpleNamespace(isOK=lambda: False, getErrorCode=lambda: 'TEST_DENIED')

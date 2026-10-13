@@ -50,10 +50,12 @@ export async function apiGet<T>(path: string, signal?: AbortSignal): Promise<T> 
 
 export async function apiPost<T>(
   path: string,
-  body?: unknown
+  body?: unknown,
+  signal?: AbortSignal
 ): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method: "POST",
+    signal,
     headers: {
       "Content-Type": "application/json",
     },

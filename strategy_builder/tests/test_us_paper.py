@@ -9,6 +9,8 @@ class Response:
     def isOK(self):return True
     def getBody(self):return self.body
     def getHeader(self):return SimpleNamespace(tr_cont='')
+    def getErrorCode(self):return 'TEST_DENIED'
+    def getErrorMessage(self):return getattr(self.body,'msg1','')
 class PaperTests(unittest.TestCase):
     def setUp(self):
         self.temp=tempfile.TemporaryDirectory()

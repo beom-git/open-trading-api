@@ -8,13 +8,14 @@ import pandas as pd
 
 import kis_auth as ka
 from core.instruments import Instrument, US_EXCHANGES
+from core.provider_errors import kis_error
 
 
 def _fetch(path: str, tr_id: str, instrument: Instrument, extra: dict | None = None):
     params = {"AUTH": "", "EXCD": US_EXCHANGES[instrument.exchange], "SYMB": instrument.ticker}
     response = ka._url_fetch(path, tr_id, "", params | (extra or {}))
     if not response.isOK():
-        raise RuntimeError(f"미국 주식 시세 조회 실패 ({instrument.code}): {response.getErrorCode()}")
+        raise RuntimeError(f"미국 주식 시세 조회 실패 ({instrument.code}): {kis_error(response)[0]}")
     return response.getBody()
 
 

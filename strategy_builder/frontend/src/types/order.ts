@@ -16,7 +16,8 @@ export interface OrderRequest {
 }
 
 export interface OrderResult {
-  status: "success" | "error";
+  status: "success" | "error" | "unknown";
+  currency?: "USD" | "KRW";
   order_id?: string;
   message: string;
 }

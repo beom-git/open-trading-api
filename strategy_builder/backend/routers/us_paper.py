@@ -29,23 +29,27 @@ class Cancel(BaseModel):
     order_no: str = Field(min_length=1,max_length=50)
     quantity: int = Field(gt=0,strict=True)
 
-def guard():
+def guard(paper_only=True):
     if not is_authenticated(): raise HTTPException(401,'인증이 필요합니다')
-    if get_current_mode()!='vps' or not ka.isPaperTrading():
-        raise HTTPException(403,'미국 주문과 계좌 조회는 모의 모드에서만 지원합니다')
+    mode=get_current_mode()
+    if mode not in ('vps','prod') or ka.isPaperTrading() != (mode=='vps'):
+        raise HTTPException(403,'설정 모드와 KIS 인증 모드가 일치하지 않습니다')
+    if paper_only and mode!='vps':
+        raise HTTPException(403,'이전 모의 전용 경로입니다. 공통 미국 주문 경로를 사용하세요')
+    return mode
 
 def journal_path():
     path=Path(os.environ.get('KIS_ORDER_JOURNAL',str(Path.home()/'.kis_strategy_builder'/'paper_orders.sqlite3')))
     path.parent.mkdir(parents=True,exist_ok=True)
     return path
 
-def once(request,operation,call):
-    guard()
+def once(request,operation,call,paper_only=True):
+    mode=guard(paper_only)
     value=us_paper.instrument(request.instrument_id)
     if isinstance(request,Order): us_paper.validate_price(request.price)
     account=ka.getTREnv()
     # Namespace keys by actual paper account; no account credentials are persisted.
-    scope=hashlib.sha256(f'{account.my_acct}:{account.my_prod}'.encode()).hexdigest()
+    scope=hashlib.sha256(f'{mode}:{account.my_acct}:{account.my_prod}'.encode()).hexdigest()
     key=scope+':'+request.request_id
     payload=request.model_dump(mode='json') | {'instrument_id':value.id,'operation':operation}
     serialized=json.dumps(payload,sort_keys=True)
@@ -67,7 +71,7 @@ def once(request,operation,call):
         result=dict(status='rejected',message=str(e))
     except Exception:
         result=dict(status='unknown',message='주문 접수 여부를 확인할 수 없습니다. 주문내역을 재조회하세요. 재전송하지 않습니다.')
-    result |= dict(request_id=request.request_id,fetched_at=datetime.now(timezone.utc).isoformat(),mode='vps')
+    result |= dict(request_id=request.request_id,fetched_at=datetime.now(timezone.utc).isoformat(),mode=mode)
     with closing(sqlite3.connect(path,timeout=10)) as db, db:
         db.execute('UPDATE requests SET result=? WHERE key=?',(json.dumps(result),key))
     return result
