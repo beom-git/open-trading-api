@@ -12,6 +12,10 @@ import {
   Wallet,
   Package,
 } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useCurrency } from "@/contexts/CurrencyContext";
+import { isUSInstrument } from "@/lib/instruments";
+import { formatKstDateTime } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 import { OrderbookPanel } from "./OrderbookPanel";
 import type { OrderRequest, OrderAction, OrderType } from "@/types/order";
@@ -38,6 +42,10 @@ export function OrderConfirmModal({
   onCancel,
   isLoading,
 }: OrderConfirmModalProps) {
+  const { status } = useAuth();
+  const { displayCurrency, usableRate, exchangeRate } = useCurrency();
+  const isUS = isUSInstrument(signal.code);
+  const unit = isUS ? "USD" : "원";
   const currentPrice = priceData?.price || 0;
   const change = priceData?.change || 0;
   const changeRate = priceData?.change_rate || 0;
@@ -45,7 +53,7 @@ export function OrderConfirmModal({
   const [quantity, setQuantity] = useState(1);
   const [orderType, setOrderType] = useState<OrderType>("limit");
   const [limitPrice, setLimitPrice] = useState(signal.target_price || currentPrice);
-  const [showOrderbook, setShowOrderbook] = useState(true);
+  const [showOrderbook, setShowOrderbook] = useState(!isUS);
 
   // Update limit price when current price loads (if no target_price)
   useEffect(() => {
@@ -89,7 +97,7 @@ export function OrderConfirmModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+    <div role="dialog" aria-modal="true" aria-label="주문 확인" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className={cn(
         "w-full bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden",
         showOrderbook ? "max-w-3xl" : "max-w-md"
@@ -106,6 +114,7 @@ export function OrderConfirmModal({
           </h2>
           <div className="flex items-center gap-2">
             <button
+              disabled={isUS}
               onClick={() => setShowOrderbook(!showOrderbook)}
               className="p-1 rounded-full hover:bg-white/20 transition-colors"
               title={showOrderbook ? "호가창 숨기기" : "호가창 표시"}
@@ -174,9 +183,9 @@ export function OrderConfirmModal({
                       : "text-slate-900 dark:text-slate-100"
                   )}
                 >
-                  {currentPrice.toLocaleString()}
+                  {currentPrice.toLocaleString(undefined, {maximumFractionDigits: isUS ? 4 : 0})}
                 </span>
-                <span className="text-sm text-slate-500">원</span>
+                <span className="text-sm text-slate-500">{unit}</span>
               </div>
 
               {/* Change Info */}
@@ -214,11 +223,12 @@ export function OrderConfirmModal({
                   </span>
                 </div>
                 <span className="font-mono font-medium text-green-700 dark:text-green-400">
-                  {buyable.amount.toLocaleString()}원
+                  {buyable.amount.toLocaleString()} {unit}
                 </span>
               </div>
             )}
 
+            {isBuy && !buyable && <p role="status" className="text-sm text-amber-600">매수 가능 금액을 확인하지 못했습니다. 계좌 조회 상태를 확인하세요.</p>}
             {/* Sellable Quantity (for SELL orders) */}
             {!isBuy && sellableQty != null && (
               <div className="p-3 bg-red-50 dark:bg-red-900/20 rounded-lg flex items-center justify-between">
@@ -252,6 +262,7 @@ export function OrderConfirmModal({
                   지정가
                 </button>
                 <button
+                  disabled={isUS}
                   onClick={() => setOrderType("market")}
                   className={cn(
                     "px-4 py-2 rounded-lg border-2 transition-all",
@@ -274,12 +285,14 @@ export function OrderConfirmModal({
                 <div className="relative">
                   <input
                     type="number"
+                    aria-label="지정가"
+                    step={isUS ? "any" : 1}
                     value={limitPrice}
                     onChange={(e) => setLimitPrice(Number(e.target.value))}
                     className="w-full px-4 py-3 pr-12 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary focus:border-transparent"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500">
-                    원
+                    {unit}
                   </span>
                 </div>
                 {showOrderbook && (
@@ -314,7 +327,9 @@ export function OrderConfirmModal({
                 </button>
                 <input
                   type="number"
+                  aria-label="주문 수량"
                   min={1}
+                  step={1}
                   value={quantity}
                   onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
                   className="flex-1 px-4 py-3 text-center border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -335,7 +350,7 @@ export function OrderConfirmModal({
                   예상 금액
                 </span>
                 <span className="text-xl font-bold">
-                  {estimatedAmount.toLocaleString()}원
+                  {estimatedAmount.toLocaleString(undefined, {maximumFractionDigits: isUS ? 4 : 0})} {unit}
                 </span>
               </div>
               {isBuy && buyable && estimatedAmount > buyable.amount && (
@@ -345,12 +360,13 @@ export function OrderConfirmModal({
               )}
             </div>
 
+            <p>설정 모드: {status.mode === "vps" ? "모의투자" : "실전투자"} · 거래소 {signal.code.split(":")[0]} · 주문 통화 {unit}</p>
+            {isUS && displayCurrency === "KRW" && usableRate !== null && <p>참고 {(estimatedAmount * usableRate).toLocaleString("ko-KR")} KRW · 적용 환율 {usableRate} · {exchangeRate && formatKstDateTime(exchangeRate.fetched_at)}. 실제 제출은 USD입니다.</p>}
             {/* Warning */}
             <div className="flex items-start gap-3 p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg">
               <AlertTriangle className="w-5 h-5 text-yellow-600 flex-shrink-0 mt-0.5" />
               <p className="text-sm text-yellow-700 dark:text-yellow-400">
-                주문 실행 시 실제 체결이 이루어집니다. 주문 내용을 다시 확인해
-                주세요.
+                {status.mode === "vps" ? "모의 계좌에 가상 자금으로 주문합니다." : "실전 계좌의 실제 자금으로 주문합니다."} 접수와 체결은 다릅니다. 주문 내용을 확인하세요.
               </p>
             </div>
 
@@ -365,7 +381,7 @@ export function OrderConfirmModal({
               </button>
               <button
                 onClick={handleConfirm}
-                disabled={isLoading || (isBuy && !!buyable && estimatedAmount > buyable.amount)}
+                disabled={isLoading || !status.authenticated || !Number.isInteger(quantity) || quantity <= 0 || !Number.isFinite(price) || price <= 0 || (isBuy && !!buyable && estimatedAmount > buyable.amount)}
                 className={cn(
                   "flex-1 px-4 py-3 rounded-lg text-white font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed",
                   isBuy ? "bg-green-500 hover:bg-green-600" : "bg-red-500 hover:bg-red-600"

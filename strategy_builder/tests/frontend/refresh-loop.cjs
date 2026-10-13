@@ -1,0 +1,26 @@
+const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict'),Module=require('node:module');
+const ts=require('../../frontend/node_modules/typescript');
+const source=path.resolve(__dirname,'../../frontend/src/lib/refresh-loop.ts');
+const compiled=ts.transpileModule(fs.readFileSync(source,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText;
+const m=new Module(source,module);m._compile(compiled,source);const {RefreshLoop,signalIsNew}=m.exports;
+const realSet=global.setTimeout,realClear=global.clearTimeout;let timers=new Map(),count=0;
+global.setTimeout=(fn,ms)=>{const id=++count;timers.set(id,{fn,ms});return id};global.clearTimeout=id=>timers.delete(id);
+const flush=async()=>{for(let i=0;i<6;i++)await Promise.resolve()};
+const tick=async()=>{const [id,t]=timers.entries().next().value;timers.delete(id);t.fn();await flush();return t.ms};
+(async()=>{
+ let calls=0,resolves=[],results=[],errors=[],states=[];
+ const loop=new RefreshLoop(()=>{calls++;return new Promise(resolve=>resolves.push(resolve))},30000,v=>results.push(v),e=>errors.push(e),(s,n)=>states.push([s,n]));
+ loop.start();loop.start();assert.equal(timers.size,1);await tick();assert.equal(calls,1);loop.manual();assert.equal(calls,1);
+ loop.pause();resolves.shift()('obsolete');await flush();assert.deepEqual(results,[]);assert.equal(timers.size,0);
+ loop.start();await tick();loop.setVisible(false);resolves.shift()('hidden late');await flush();assert.deepEqual(results,[]);assert.equal(timers.size,0);
+ loop.setVisible(true);await tick();resolves.shift()('current');await flush();assert.deepEqual(results,['current']);assert.equal(timers.size,1);
+ loop.dispose();assert.equal(timers.size,0);
+ calls=0;let fail=true;
+ const recovery=new RefreshLoop(async()=>{calls++;if(fail)throw Error('offline');return 'ok'},100,v=>results.push(v),e=>errors.push(e),(s,n)=>states.push([s,n]));
+ recovery.start();await tick();assert.equal(timers.values().next().value.ms,200);await tick();assert.equal(timers.values().next().value.ms,400);
+ fail=false;await tick();assert.equal(results.at(-1),'ok');assert.equal(timers.values().next().value.ms,100);
+ fail=true;for(let i=0;i<5;i++)await tick();assert.equal(timers.size,0);assert.match(states.at(-1)[0],/자동 갱신 중지/);
+ fail=false;recovery.manual();await flush();assert.equal(results.at(-1),'ok');recovery.dispose();
+ assert.equal(signalIsNew(undefined,'id'),false);assert.equal(signalIsNew('id','id'),false);assert.equal(signalIsNew('id','next'),true);
+ console.log('PASS refresh-loop: start/stop, overlap, hidden/resume, stale response, backoff/circuit, recovery, identity');
+})().catch(e=>{console.error(e);process.exitCode=1}).finally(()=>{global.setTimeout=realSet;global.clearTimeout=realClear});

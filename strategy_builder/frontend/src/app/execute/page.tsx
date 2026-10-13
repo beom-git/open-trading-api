@@ -1,6 +1,7 @@
 "use client";
 
-import { USPaperPanel } from "@/components/execute/USPaperPanel";
+import { USStockAccount } from "@/components/execute/USStockAccount";
+import { apiGet } from "@/lib/api/client";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { Play, Loader2, Zap } from "lucide-react";
 import {
@@ -51,6 +52,9 @@ export default function ExecutePage() {
   } = useStrategyExecutor();
   const { execute: executeOrder, isLoading: orderLoading } = useOrder();
 
+  const [accountTab, setAccountTab] = useState<"KR" | "US">("KR");
+  useEffect(() => { try { if (localStorage.getItem("kis_account_tab") === "US") setAccountTab("US"); } catch {} }, []);
+  const chooseAccountTab = (tab: "KR" | "US") => { setAccountTab(tab); try { localStorage.setItem("kis_account_tab", tab); } catch {} };
   const [stocks, setStocks] = useState<string[]>([]);
   const [selectedSignal, setSelectedSignal] = useState<SignalResult | null>(null);
   const selectionVersion = useRef(0);
@@ -194,6 +198,20 @@ export default function ExecutePage() {
     }
   };
 
+  useEffect(() => { selectionVersion.current++; setShowOrderModal(false); setSelectedSignal(null); }, [authStatus.mode]);
+
+  const openUSOrder = async () => {
+    if (!selectedSignal || !isUSInstrument(selectedSignal.code) || !priceData || !authStatus.authenticated) return;
+    if (selectedSignal.action !== "BUY" && selectedSignal.action !== "SELL") return;
+    const version = selectionVersion.current;
+    setBuyableInfo(null); setSellableQty(null);
+    if (selectedSignal.action === "BUY") {
+      try { const response = await apiGet<{data: BuyableInfo}>(`/api/us-stock/buyable?instrument_id=${encodeURIComponent(selectedSignal.code)}&price=${priceData.price}`); if (version !== selectionVersion.current) return; setBuyableInfo(response.data); }
+      catch { /* Buying power is unavailable; the server still validates the actual order. */ }
+    }
+    if (version === selectionVersion.current) setShowOrderModal(true);
+  };
+
   const handleOrderConfirm = async (request: OrderRequest) => {
     const result = await executeOrder(request);
 
@@ -211,6 +229,8 @@ export default function ExecutePage() {
     setShowOrderModal(false);
     setSelectedSignal(null);
     setShowResultModal(true);
+
+    if (isUSInstrument(request.stock_code)) { chooseAccountTab("US"); return; }
 
     // 백엔드 캐시 클리어 후 KIS API 반영 대기, 그 다음 프론트 갱신
     await clearAccountCache();
@@ -322,8 +342,8 @@ export default function ExecutePage() {
                     {displayCurrency === "KRW" && !showKrw && <p className="text-xs text-amber-600">환율을 확인할 수 없어 달러로 표시합니다.</p>}
                   </>
                 )}
-                <p className="text-xs text-slate-500">KIS 제공 시세이며 지연될 수 있습니다. 미국 주문은 모의 모드에서만 가능합니다.</p>
-                <USPaperPanel instrumentId={selectedSignal.code} currentPrice={priceData?.price}/>
+                <p className="text-xs text-slate-500">KIS 제공 시세이며 지연될 수 있습니다. 주문은 설정의 인증 및 모드를 따릅니다.</p>
+                <button className="border rounded p-2" disabled={!authStatus.authenticated || !priceData || quoteLoading || !["BUY", "SELL"].includes(selectedSignal.action)} onClick={openUSOrder}>주문 확인</button>
               </div>
             )}
 
@@ -334,7 +354,12 @@ export default function ExecutePage() {
           </div>
 
           {/* Right Panel - Holdings */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1" aria-label="계좌 영역">
+            <div role="tablist" aria-label="계좌 시장" className="flex gap-2 mb-3">
+              <button role="tab" aria-selected={accountTab === "KR"} onClick={() => chooseAccountTab("KR")}>국내 주식</button>
+              <button role="tab" aria-selected={accountTab === "US"} onClick={() => chooseAccountTab("US")}>미국 주식</button>
+            </div>
+            <div role="tabpanel" aria-label="국내 계좌" hidden={accountTab !== "KR"}>
             <p className="text-xs text-slate-500 mb-2">국내 주식 잔고·미체결 주문</p>
             <HoldingsList
               holdings={holdings}
@@ -344,6 +369,8 @@ export default function ExecutePage() {
               onCancelOrder={handleCancelOrder}
               isLoading={accountLoading}
             />
+            </div>
+            <div role="tabpanel" aria-label="미국 계좌" hidden={accountTab !== "US"}><USStockAccount /></div>
           </div>
         </div>
       </div>
@@ -351,6 +378,7 @@ export default function ExecutePage() {
       {/* Order Confirmation Modal */}
       {showOrderModal && selectedSignal && (
         <OrderConfirmModal
+          key={selectedSignal.code}
           signal={selectedSignal}
           priceData={priceData}
           buyable={buyableInfo}

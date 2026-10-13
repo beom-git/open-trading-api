@@ -91,7 +91,7 @@ export function SignalList({ signals, onSelect, selectedCode }: SignalListProps)
               </div>
               <p className="text-sm text-slate-500 line-clamp-1">{signal.reason}</p>
               {signal.order_supported === false && signal.action !== "ERROR" && (
-                <p className="text-xs text-slate-500">{signal.currency} · 시세 조회 가능 · 미국 모의 주문은 별도 패널에서 제공</p>
+                <p className="text-xs text-slate-500">{signal.currency} · 시세 조회 가능 · 미국 주문은 앱 전체 인증 모드를 사용</p>
               )}
             </div>
 

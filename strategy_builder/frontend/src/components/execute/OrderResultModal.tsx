@@ -25,6 +25,8 @@ export function OrderResultModal({
   onClose,
 }: OrderResultModalProps) {
   const [copied, setCopied] = useState(false);
+  const isUnknown = result.status === "unknown";
+  const unit = result.currency === "USD" ? "USD" : "원";
   const isSuccess = result.status === "success";
   const isBuy = orderInfo.action === "BUY";
 
@@ -39,13 +41,13 @@ export function OrderResultModal({
   const totalAmount = orderInfo.price * orderInfo.quantity;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+    <div role="dialog" aria-modal="true" aria-label="주문 결과" className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
       <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl shadow-2xl overflow-hidden">
         {/* Header */}
         <div
           className={cn(
             "px-6 py-6 flex flex-col items-center",
-            isSuccess
+            isUnknown ? "bg-amber-600" : isSuccess
               ? "bg-gradient-to-b from-green-500 to-green-600"
               : "bg-gradient-to-b from-red-500 to-red-600"
           )}
@@ -64,12 +66,12 @@ export function OrderResultModal({
           )}
 
           <h2 className="text-xl font-bold text-white">
-            {isSuccess ? "주문 완료" : "주문 실패"}
+            {isUnknown ? "접수 확인 필요" : isSuccess ? "주문 접수" : "주문 거절 또는 오류"}
           </h2>
           <p className="text-white/80 text-sm mt-1">
             {isSuccess
               ? `${isBuy ? "매수" : "매도"} 주문이 접수되었습니다`
-              : "주문 처리 중 오류가 발생했습니다"}
+              : isUnknown ? "자동 재전송하지 않습니다. 계좌 내역을 확인하세요." : "주문 처리 중 오류가 발생했습니다"}
           </p>
         </div>
 
@@ -104,7 +106,7 @@ export function OrderResultModal({
             <div className="flex items-center justify-between">
               <span className="text-sm text-slate-500">주문가격</span>
               <span className="font-mono font-medium">
-                {orderInfo.price.toLocaleString()}원
+                {orderInfo.price.toLocaleString(undefined, {maximumFractionDigits: unit === "USD" ? 4 : 0})} {unit}
               </span>
             </div>
 
@@ -120,7 +122,7 @@ export function OrderResultModal({
                 총 주문금액
               </span>
               <span className="text-lg font-bold text-slate-900 dark:text-white">
-                {totalAmount.toLocaleString()}원
+                {totalAmount.toLocaleString(undefined, {maximumFractionDigits: unit === "USD" ? 4 : 0})} {unit}
               </span>
             </div>
           </div>

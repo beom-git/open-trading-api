@@ -47,5 +47,5 @@ def parse_instrument(code: str) -> Instrument:
 def require_domestic(code: str) -> Instrument:
     instrument = parse_instrument(code)
     if instrument.is_overseas:
-        raise ValueError("미국 주식은 시세 조회와 시그널 생성만 지원합니다. 해외 주문·호가·잔고 기능은 아직 지원하지 않습니다.")
+        raise ValueError("미국 주식은 국내 전용 API로 처리할 수 없습니다. 해외 주문·잔고는 공통 미국 API를 사용하세요.")
     return instrument

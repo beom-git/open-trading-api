@@ -194,7 +194,7 @@ def _run_strategy_on_stocks(
                 'target_price': getattr(signal, 'target_price', None),
                 'currency': instrument.currency,
                 'exchange': instrument.exchange,
-                'order_supported': not instrument.is_overseas,
+                'order_supported': True,
             }
             results.append(result)
 
