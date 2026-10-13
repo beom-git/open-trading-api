@@ -80,3 +80,50 @@ def get_current_price(instrument: Instrument) -> dict:
         "w52_high": number("h52p"), "w52_low": number("l52p"),
         "currency": instrument.currency, "exchange": instrument.exchange,
     }
+
+
+def get_history_range(instrument: Instrument, start: str, end: str, warmup: int = 100):
+    """Page backwards from an explicit end date. Never label calendar completeness as verified."""
+    lower = datetime.strptime(start, '%Y%m%d') - timedelta(days=warmup * 3 + 14)
+    before, rows, exhausted = end, [], False
+    columns = ['date', 'open', 'high', 'low', 'close', 'volume']
+    for _ in range(40):
+        body = _fetch('/uapi/overseas-price/v1/quotations/dailyprice', 'HHDFS76240000', instrument,
+                      {'GUBN': '0', 'BYMD': before, 'MODP': '1'})
+        page = getattr(body, 'output2', None)
+        if not page:
+            exhausted = True
+            break
+        frame = pd.DataFrame(page).rename(columns={'xymd': 'date', 'clos': 'close', 'tvol': 'volume'})
+        if not set(columns).issubset(frame.columns):
+            raise ValueError('일봉 필드 누락')
+        frame = frame[columns].copy()
+        frame['date'] = pd.to_datetime(frame['date'], format='%Y%m%d', errors='raise').dt.strftime('%Y%m%d')
+        frame = frame[frame['date'] <= before]
+        if frame.empty:
+            raise ValueError('일봉 페이지가 진행되지 않습니다')
+        for c in columns[1:]:
+            frame[c] = pd.to_numeric(frame[c], errors='raise')
+        if not frame[columns[1:]].map(math.isfinite).all().all():
+            raise ValueError('유효하지 않은 일봉 값')
+        if (frame[['open','high','low','close']] <= 0).any().any() or (frame['volume'] < 0).any():
+            raise ValueError('가격/거래량 범위 오류')
+        if ((frame['high'] < frame[['open','close','low']].max(axis=1)) |
+            (frame['low'] > frame[['open','close','high']].min(axis=1))).any():
+            raise ValueError('OHLC 범위 오류')
+        rows.extend(frame.to_dict('records'))
+        earliest = datetime.strptime(frame['date'].min(), '%Y%m%d')
+        if earliest <= lower:
+            exhausted = True
+            break
+        before = (earliest - timedelta(days=1)).strftime('%Y%m%d')
+    if not rows:
+        raise ValueError('일봉 데이터가 없습니다')
+    frame = pd.DataFrame(rows).drop_duplicates('date').sort_values('date').reset_index(drop=True)
+    selected = frame[(frame.date >= start) & (frame.date <= end)]
+    if len(selected) < 2:
+        raise ValueError('요청 기간 데이터가 부족합니다')
+    return frame, dict(source='KIS overseas dailyprice', adjusted=True, requested_start=start, requested_end=end,
+                      actual_start=selected.date.min(), actual_end=selected.date.max(),
+                      pagination_finished=exhausted, completeness='unverified',
+                      warning='거래일 달력 및 공급자 결측 확인이 없어 전체 기간의 완전성을 보장하지 않습니다. 과거 환율 미제공: USD 성과만 표시합니다.')

@@ -12,7 +12,7 @@ sys.path.insert(0, project_root)
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routers import strategy, auth, market, orders, account, files, symbols
+from backend.routers import strategy, auth, market, orders, account, files, symbols, backtest
 
 # FastAPI 앱 생성
 app = FastAPI(
@@ -40,6 +40,7 @@ app.include_router(market.router, prefix="/api/market", tags=["시장정보"])
 app.include_router(orders.router, prefix="/api/orders", tags=["주문"])
 app.include_router(account.router, prefix="/api/account", tags=["계좌"])
 app.include_router(files.router, prefix="/api/files", tags=["파일"])
+app.include_router(backtest.router, prefix="/api/backtest", tags=["백테스트"])
 app.include_router(symbols.router, prefix="/api/symbols", tags=["종목"])
 
 
