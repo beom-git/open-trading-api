@@ -26,8 +26,64 @@
 ### 사전 요구사항
 
 - Python 3.11+ / [uv](https://docs.astral.sh/uv/)
-- Node.js 18+ / npm
+- Node.js 20.9+ / npm (Next.js 16 요구사항)
 - KIS Open API 키 ([설정 방법](../README.md#35-kis_devlpyaml-설정))
+
+### PC에서 모의투자 실행 (Linux / WSL)
+
+KIS 서버에 접속 가능한 PC에서 실행하면 클라우드 VPN이 필요하지 않습니다.
+아래 명령은 저장소 루트에서 시작합니다.
+
+```bash
+cd strategy_builder
+uv sync
+# 기존 .env는 덮어쓰지 않습니다.
+test -e .env || (umask 077; cp .env.example .env)
+```
+
+로컬 편집기로 `.env`를 열어 `paper_app`, `paper_sec`, `my_paper_stock`,
+`my_htsid`를 입력합니다. `my_paper_stock`은 모의투자 주식 계좌 앞 8자리이며
+앞자리 0을 유지합니다. `my_prod=01`은 주식 계좌 상품코드입니다.
+실전용 항목은 모의투자만 사용할 때 비워둡니다. `.env`는 Git에서 제외됩니다.
+클라우드에 등록한 시크릿은 PC로 자동 전달되지 않으므로 PC에 별도로 설정해야 합니다.
+
+설정 우선순위는 **프로세스 환경변수 > `strategy_builder/.env` >
+`~/KIS/config/kis_devlp.yaml` > 기본값**입니다. 비어 있는 환경변수와 `.env` 항목은
+기존 값을 덮어쓰지 않습니다. YAML 파일 없이도 빌더를 실행할 수 있습니다.
+앱키·시크릿은 메모리에서 병합하며 YAML에 복사하지 않습니다.
+발급된 접근토큰은 기존 방식대로 `~/KIS/config/`에 캐시됩니다.
+`.env`/YAML 수정은 로그인 시 다시 읽고, 프로세스 환경변수 변경은 서버를 재시작해야 합니다.
+
+```bash
+# 터미널 1: strategy_builder 디렉터리
+uv run uvicorn backend.main:app --host 127.0.0.1 --port 8000
+
+# 터미널 2: strategy_builder/frontend 디렉터리
+cd frontend
+npm ci
+npm run dev
+```
+
+로컬 브라우저에서 `http://127.0.0.1:3000`을 열고 설정에서 **모의투자**로 인증합니다.
+주문 없이 연결만 확인하려면 다음 요청을 사용합니다.
+
+```bash
+curl --fail-with-body -sS http://127.0.0.1:8000/api/health
+curl --fail-with-body -sS -X POST http://127.0.0.1:8000/api/auth/login \
+  -H 'Content-Type: application/json' -d '{"mode":"vps"}'
+curl --fail-with-body -sS http://127.0.0.1:8000/api/auth/status
+curl --fail-with-body -sS 'http://127.0.0.1:8000/api/market/price/005930?env_dv=demo'
+```
+
+로그인 응답의 `authenticated: true`, 시세 응답의 `status: success`를 확인합니다.
+헬스 체크 성공만으로 KIS 인증 성공을 판단하지 않습니다.
+
+설정 로딩과 인증 실패 처리는 외부 API 호출 없이 검증할 수 있습니다.
+
+```bash
+# strategy_builder 디렉터리
+uv run python -m unittest discover -s tests -v
+```
 
 ### 서버 실행
 

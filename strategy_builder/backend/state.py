@@ -151,22 +151,10 @@ class TradingState:
                 logger.warning(f"토큰 삭제 실패: {e}")
 
     def _reload_config(self) -> None:
-        """kis_devlp.yaml 변경사항을 ka._cfg에 반영한다.
-
-        ka._cfg는 모듈 임포트 시 한 번만 로드되므로,
-        yaml을 수정한 뒤 인증 시도 시 이 메서드로 재로드해야 반영된다.
-        """
-        import yaml as _yaml
-        config_path = os.path.join(
-            os.path.expanduser("~"), "KIS", "config", "kis_devlp.yaml"
-        )
-        try:
-            with open(config_path, encoding="UTF-8") as f:
-                new_cfg = _yaml.load(f, Loader=_yaml.FullLoader)
-            ka._cfg.clear()
-            ka._cfg.update(new_cfg)
-        except Exception as e:
-            logger.warning(f"설정 파일 재로드 실패: {e}")
+        """로그인 때 환경변수/.env/YAML 우선순위를 유지하여 재로드한다."""
+        new_cfg = ka.load_kis_config()
+        ka._cfg.clear()
+        ka._cfg.update(new_cfg)
 
     def authenticate(self, mode: str = "vps") -> bool:
         """KIS API 인증

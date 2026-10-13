@@ -28,6 +28,7 @@ from Crypto.Cipher import AES
 
 # pip install pycryptodome
 from Crypto.Util.Padding import unpad
+from core.kis_config import load_kis_config
 
 
 def clearConsole():
@@ -42,14 +43,8 @@ token_tmp = os.path.join(
     config_root, f"KIS{datetime.today().strftime('%Y%m%d')}"
 )  # 토큰 로컬저장시 파일명 년월일
 
-# 접근토큰 관리하는 파일 존재여부 체크, 없으면 생성
-if not os.path.exists(token_tmp):
-    f = open(token_tmp, "w+")
-
-# 앱키, 앱시크리트, 토큰, 계좌번호 등 저장관리, 자신만의 경로와 파일명으로 설정하시기 바랍니다.
-# pip install PyYAML (패키지설치)
-with open(os.path.join(config_root, "kis_devlp.yaml"), encoding="UTF-8") as f:
-    _cfg = yaml.load(f, Loader=yaml.FullLoader)
+# 환경변수 > strategy_builder/.env > 기존 YAML. 인증정보는 메모리에서만 병합합니다.
+_cfg = load_kis_config()
 
 _TRENV = tuple()
 _last_auth_time = datetime.now()
@@ -78,7 +73,9 @@ def save_token(my_token, my_expired):
     # print(type(my_expired), my_expired)
     valid_date = datetime.strptime(my_expired, "%Y-%m-%d %H:%M:%S")
     # print('Save token date: ', valid_date)
-    with open(token_tmp, "w", encoding="utf-8") as f:
+    os.makedirs(config_root, mode=0o700, exist_ok=True)
+    fd = os.open(token_tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w", encoding="utf-8") as f:
         f.write(f"token: {my_token}\n")
         f.write(f"valid-date: {valid_date}\n")
 
@@ -143,7 +140,8 @@ def isPaperTrading():  # 모의투자 매매
 
 
 # 실전투자면 'prod', 모의투자면 'vps'를 셋팅 하시기 바랍니다.
-def changeTREnv(token_key, svr="prod", product=_cfg["my_prod"]):
+def changeTREnv(token_key, svr="prod", product=None):
+    product = _cfg["my_prod"] if product is None else product
     cfg = dict()
 
     global _isPaper
@@ -199,7 +197,8 @@ def _getResultObject(json_data):
 
 # Token 발급, 유효기간 1일, 6시간 이내 발급시 기존 token값 유지, 발급시 알림톡 무조건 발송
 # 모의투자인 경우  svr='vps', 투자계좌(01)이 아닌경우 product='XX' 변경하세요 (계좌번호 뒤 2자리)
-def auth(svr="prod", product=_cfg["my_prod"], url=None):
+def auth(svr="prod", product=None, url=None):
+    product = _cfg["my_prod"] if product is None else product
     p = {
         "grant_type": "client_credentials",
     }
@@ -211,6 +210,11 @@ def auth(svr="prod", product=_cfg["my_prod"], url=None):
     elif svr == "vps":  # 모의투자
         ak1 = "paper_app"  # 앱키 (모의투자용)
         ak2 = "paper_sec"  # 앱시크리트 (모의투자용)
+    else:
+        raise ValueError("인증 모드는 vps 또는 prod여야 합니다")
+
+    if not _cfg.get(ak1) or not _cfg.get(ak2):
+        raise ValueError(f"{ak1}, {ak2} 설정이 필요합니다")
 
     # 앱키, 앱시크리트 가져오기
     p["appkey"] = _cfg[ak1]
@@ -222,7 +226,7 @@ def auth(svr="prod", product=_cfg["my_prod"], url=None):
     if saved_token is None:  # 기존 발급 토큰 확인이 안되면 발급처리
         url = f"{_cfg[svr]}/oauth2/tokenP"
         res = requests.post(
-            url, data=json.dumps(p), headers=_getBaseHeader()
+            url, data=json.dumps(p), headers=_getBaseHeader(), timeout=30
         )  # 토큰 발급
         rescode = res.status_code
         if rescode == 200:  # 토큰 정상 발급
@@ -232,8 +236,7 @@ def auth(svr="prod", product=_cfg["my_prod"], url=None):
             ).access_token_token_expired  # 토큰값 만료일시 가져오기
             save_token(my_token, my_expired)  # 새로 발급 받은 토큰 저장
         else:
-            print("Get Authentification token fail!\nYou have to restart your app!!!")
-            return
+            raise RuntimeError(f"KIS 인증 요청 실패 (HTTP {rescode})")
     else:
         my_token = saved_token  # 기존 발급 토큰 확인되어 기존 토큰 사용
 
@@ -253,7 +256,7 @@ def auth(svr="prod", product=_cfg["my_prod"], url=None):
 
 # end of initialize, 토큰 재발급, 토큰 발급시 유효시간 1일
 # 프로그램 실행시 _last_auth_time에 저장하여 유효시간 체크, 유효시간 만료시 토큰 발급 처리
-def reAuth(svr="prod", product=_cfg["my_prod"]):
+def reAuth(svr="prod", product=None):
     n2 = datetime.now()
     if (n2 - _last_auth_time).seconds >= 86400:  # 유효시간 1일
         auth(svr, product)
@@ -493,7 +496,7 @@ def _getBaseHeader_ws():
     return copy.deepcopy(_base_headers_ws)
 
 
-def auth_ws(svr="prod", product=_cfg["my_prod"]):
+def auth_ws(svr="prod", product=None):
     p = {"grant_type": "client_credentials"}
     if svr == "prod":
         ak1 = "my_app"
@@ -525,7 +528,7 @@ def auth_ws(svr="prod", product=_cfg["my_prod"]):
         print(f"[{_last_auth_time}] => get AUTH Key completed!")
 
 
-def reAuth_ws(svr="prod", product=_cfg["my_prod"]):
+def reAuth_ws(svr="prod", product=None):
     n2 = datetime.now()
     if (n2 - _last_auth_time).seconds >= 86400:
         auth_ws(svr, product)
