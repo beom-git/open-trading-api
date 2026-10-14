@@ -27,3 +27,8 @@ def preview():return call(service().preview)
 def history():
     snapshot=service().snapshot()
     return dict(orders=snapshot['orders'],signals=snapshot['signals'],fetched_at=snapshot['fetched_at'])
+
+@router.post("/verify")
+def verify():
+    from core.auto_verification import verify as run
+    return call(run)

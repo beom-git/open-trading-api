@@ -122,6 +122,13 @@ class AutoTests(unittest.TestCase):
   self.mocks['holdings'].return_value=[dict(instrument_id=auto.CODE,quantity=3)]
   self.reset_signal();self.engine.tick();self.assertFalse(self.engine.snapshot()['running'])
   self.mocks['submit'].assert_not_called()
+ def test_start_requires_account_and_buyable_success(self):
+  self.engine.stop()
+  for name in ('holdings','buyable'):
+   self.mocks[name].side_effect=RuntimeError('90070000 account identity mismatch')
+   with self.assertRaisesRegex(RuntimeError,'90070000'):self.engine.start('vps')
+   self.assertFalse(self.engine.snapshot()['running']);self.mocks['submit'].assert_not_called()
+   self.mocks[name].side_effect=None
  def test_api_settings_mode_and_read(self):
   client=TestClient(app)
   with patch('backend.routers.auto_trading.service',return_value=self.engine):

@@ -49,6 +49,8 @@ class TradingState:
 
     def _load_mode_file(self) -> str:
         """저장된 모드 파일 읽기. 없거나 잘못된 경우 기본값 'vps' 반환."""
+        if ka.paper_only():
+            return "vps"
         path = self._get_mode_file_path()
         try:
             if os.path.exists(path):
@@ -120,6 +122,7 @@ class TradingState:
             # JWT jti로 실제 모드 감지 (KIS_MODE 파일보다 우선)
             detected = self._detect_mode_from_token()
             mode = detected if detected else self._current_mode
+            ka.require_allowed_mode(mode)
             ka.auth(svr=mode)
             self._authenticated = True
             self._current_mode = mode
@@ -168,6 +171,7 @@ class TradingState:
         Raises:
             Exception: 쿨다운 중 모드 전환 시도 시
         """
+        ka.require_allowed_mode(mode)
         switching_mode = self._authenticated and self._current_mode != mode
 
         # 모드 변경 시 쿨다운 체크
@@ -253,7 +257,8 @@ class TradingState:
             "authenticated": self.is_authenticated,
             "mode": self._current_mode,
             "mode_display": self.mode_display,
-            "can_switch_mode": can_switch,
+            "can_switch_mode": can_switch and not ka.paper_only(),
+            "paper_only": ka.paper_only(),
             "cooldown_remaining": remaining,
         }
 

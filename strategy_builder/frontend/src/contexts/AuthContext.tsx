@@ -51,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           authenticated: true,
           mode: response.mode,
           mode_display: response.mode_display,
+          paper_only: response.paper_only,
           can_switch_mode: response.can_switch_mode,
           cooldown_remaining: response.cooldown_remaining,
         });
@@ -90,6 +91,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           authenticated: response.authenticated,
           mode: response.mode,
           mode_display: response.mode_display,
+          paper_only: response.paper_only,
           can_switch_mode: response.can_switch_mode,
           cooldown_remaining: response.cooldown_remaining,
         });

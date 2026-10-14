@@ -28,6 +28,7 @@ class SwitchModeRequest(BaseModel):
 
 class AuthStatusResponse(BaseModel):
     authenticated: bool
+    paper_only: bool = False
     mode: str
     mode_display: str
     can_switch_mode: bool

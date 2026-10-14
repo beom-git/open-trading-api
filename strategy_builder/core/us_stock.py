@@ -4,6 +4,7 @@ from decimal import Decimal
 import kis_auth as ka
 from core.instruments import parse_instrument
 from core.provider_errors import kis_error
+from core.provider_retry import retry_read
 
 class BrokerRejected(RuntimeError):
     pass
@@ -35,6 +36,7 @@ def validate_price(price):
     return format(value,'f')
 
 def _account(mode='vps'):
+    ka.require_allowed_mode(mode)
     if mode not in ('vps','prod') or ka.isPaperTrading() != (mode=='vps'):
         raise ValueError('앱 모드와 실제 KIS 인증 모드가 일치하지 않습니다')
     env=ka.getTREnv()
@@ -46,8 +48,9 @@ def _account(mode='vps'):
 def _call(endpoint, tr_id, params, post=False, continuation='', mode='vps'):
     # Check the actual authenticated KIS mode again immediately before each request.
     payload=_account(mode) | params
-    res=ka._url_fetch('/uapi/overseas-stock/v1/trading/'+endpoint,tr_id,continuation,payload,
+    call=lambda:ka._url_fetch('/uapi/overseas-stock/v1/trading/'+endpoint,tr_id,continuation,payload,
                       postFlag=post,timeout=30)
+    res=call() if post else retry_read(call)
     if res is None:
         raise RuntimeError('KIS 응답이 없습니다')
     if not res.isOK():
