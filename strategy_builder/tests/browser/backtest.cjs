@@ -5,7 +5,7 @@ const assert=require('node:assert/strict');
  const browser=await chromium.launch({headless:true,args:['--no-sandbox']});
  const page=await browser.newPage();
  let submitted;
- const decision=(date,action,left,right)=>({date,action,indicators:{'ma(2)':right},buy:{left_label:'close',left,operator:'>',right_label:'ma(2)',right,satisfied:action==='BUY'},sell:null});
+ const decision=(date,action,left,right)=>({date,action,indicators:{'ma(2)':right,'rsi(14)':65,'bb_upper(20, 2)':12.5},buy:{operator:'AND',satisfied:action==='BUY',children:[{left_label:'close',left,operator:'>',right_label:'ma(2)',right,satisfied:action==='BUY'},{left_label:'rsi(14)',left:65,operator:'<',right_label:'threshold',right:70,satisfied:true}]},sell:{left_label:'close',left,operator:'>',right_label:'bb_upper(20, 2)',right:12.5,satisfied:false}});
  const fill={action:'BUY',signal_date:'20250102',execution_date:'20250103',price:10.25,quantity:9,cost:.9225,decision_index:0};
  const result={strategy_name:'Fixture strategy',points:[{date:'20250102',close:10,equity:100,benchmark:100,drawdown:0},{date:'20250103',close:11,equity:105,benchmark:110,drawdown:0}],decisions:[decision('20250102','BUY',10,9.5),decision('20250103','HOLD',11,11)],fills:[fill],trades:[{entry:fill,exit:{...fill,execution_date:'20250106',price:12.75},profit_loss:20.43}],total_return_pct:.2043,max_drawdown:0,total_trades:1,win_rate:1,final_equity:120.43,metadata:{source:'Test fixture only',adjusted:true,actual_start:'20250102',actual_end:'20250103',warning:'Completeness unverified'}};
  await page.route('**/api/**',async route=>{
@@ -26,9 +26,21 @@ const assert=require('node:assert/strict');
  await page.getByRole('button',{name:'20250103 10.25',exact:true}).click();
  assert.match(await page.getByRole('region',{name:'매매 근거'}).innerText(),/close 10 > ma\(2\) 9.5 → 충족/);
  assert.match(await page.getByRole('region',{name:'매매 근거'}).innerText(),/수수료 0.9225 USD/);
- assert(await page.locator('.recharts-line').count()>=4);
+ await page.getByLabel('판단 날짜',{exact:true}).selectOption('1');
+ await page.locator('circle.recharts-reference-dot-dot[fill="orange"]').first().click();
+ assert.equal(await page.getByLabel('판단 날짜',{exact:true}).inputValue(),'0','fill click must show its signal decision, not execution-day HOLD');
+ const surface=page.getByRole('heading',{name:'가격 · 녹색/빨강: 신호, 주황: 체결',exact:true}).locator('..').locator('.recharts-wrapper > svg.recharts-surface').first();
+ await surface.scrollIntoViewIfNeeded();
+ const bounds=await surface.boundingBox();await page.mouse.move(bounds.x+bounds.width*.5,bounds.y+bounds.height*.3);
+ await page.locator('.recharts-tooltip-label').first().waitFor({state:'visible'});
+ const labels=await page.locator('.recharts-tooltip-label').allTextContents();assert(labels.length>=4);assert.equal(new Set(labels).size,1,'chart tooltips must share the same date');
+ assert(await page.locator('.recharts-line').count()>=7);
+ await page.getByRole('heading',{name:'rsi(14)',exact:true}).waitFor();
+ assert(await page.locator('.recharts-legend-item').filter({hasText:'bb_upper(20, 2)'}).count()>0);
+ if(process.env.SCREENSHOTS_DIR){for(const chart of await page.locator('.recharts-wrapper').all()){await chart.scrollIntoViewIfNeeded();await page.waitForTimeout(150);}await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(300);require('node:fs').mkdirSync(process.env.SCREENSHOTS_DIR,{recursive:true});await page.screenshot({path:process.env.SCREENSHOTS_DIR+'/backtest-desktop.png',fullPage:true});}
  await page.getByLabel('확대 시작',{exact:true}).fill('1');
  await page.setViewportSize({width:390,height:844});
  assert(await page.getByRole('heading',{name:'미국 주식 백테스트 · 전략 해석'}).isVisible());
+ if(process.env.SCREENSHOTS_DIR){await page.evaluate(()=>window.scrollTo(0,0));await page.waitForTimeout(300);await page.screenshot({path:process.env.SCREENSHOTS_DIR+'/backtest-mobile.png',fullPage:true});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'backtest must not overflow horizontally');}
  await browser.close();console.log('PASS browser backtest: request, backend values, trade evidence, zoom, mobile');
 })().catch(e=>{console.error(e);process.exit(1)});

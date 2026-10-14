@@ -32,8 +32,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ko">
+    // Extensions can add attributes to the document root before React hydrates.
+    // Suppress only html/body attribute differences; app subtree mismatches remain visible.
+    <html lang="ko" suppressHydrationWarning>
       <body
+        suppressHydrationWarning
         className={`${notoSansKR.variable} ${geistSans.variable} ${geistMono.variable} antialiased min-h-screen`}
       >
         <Providers>
