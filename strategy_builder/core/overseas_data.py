@@ -128,3 +128,22 @@ def get_history_range(instrument: Instrument, start: str, end: str, warmup: int 
                       actual_start=selected.date.min(), actual_end=selected.date.max(),
                       pagination_finished=exhausted, completeness='unverified',
                       warning='거래일 달력 및 공급자 결측 확인이 없어 전체 기간의 완전성을 보장하지 않습니다. 과거 환율 미제공: USD 성과만 표시합니다.')
+
+
+def latest_minute(instrument: Instrument) -> dict:
+    """Use provider local date/time, never substitute application fetch time."""
+    from zoneinfo import ZoneInfo
+    body = _fetch('/uapi/overseas-price/v1/quotations/inquire-time-itemchartprice',
+                  'HHDFS76950200', instrument,
+                  {'NMIN':'1','PINC':'0','NEXT':'','NREC':'3','FILL':'','KEYB':''})
+    rows = getattr(body, 'output2', None)
+    if not isinstance(rows, list) or not rows:
+        raise ValueError('최근 분봉 데이터가 없습니다')
+    parsed = []
+    for row in rows:
+        stamp = datetime.strptime(row['xymd'] + row['xhms'], '%Y%m%d%H%M%S').replace(tzinfo=ZoneInfo('America/New_York'))
+        price = Decimal(str(row['last']))
+        if not price.is_finite() or price <= 0:
+            raise ValueError('분봉 가격 오류')
+        parsed.append(dict(price=str(price), provider_at=stamp.isoformat()))
+    return max(parsed, key=lambda row: row['provider_at'])
