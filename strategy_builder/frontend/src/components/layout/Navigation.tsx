@@ -9,6 +9,7 @@ import { ExchangeRateTicker } from "./ExchangeRateTicker";
 import { SettingsModal } from "@/components/settings";
 
 const navItems = [
+  { href: "/auto-trading", label: "자동매매", icon: Play },
   { href: "/watchlist", label: "관심 종목", icon: TrendingUp },
   { href: "/backtest", label: "미국 백테스트", icon: TrendingUp },
   { href: "/builder", label: "전략 빌더", icon: Sparkles },

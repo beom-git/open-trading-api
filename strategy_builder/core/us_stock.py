@@ -105,12 +105,13 @@ def holdings(mode='vps'):
         qty=number(row,'ovrs_cblc_qty')
         if qty <= 0: continue
         result.append(dict(instrument_id=value.id,name=row.get('ovrs_item_name',value.ticker),
-                           currency='USD',exchange=exchange,quantity=qty,avg_price=number(row,'pchs_avg_pric'),
+                           currency='USD',exchange=exchange,quantity=qty,
+                           orderable_quantity=number(row,'ord_psbl_qty') if row.get('ord_psbl_qty') not in (None,'') else None,avg_price=number(row,'pchs_avg_pric'),
                            current_price=number(row,'now_pric2'),eval_amount=number(row,'ovrs_stck_evlu_amt'),
                            profit_loss=number(row,'frcr_evlu_pfls_amt'),profit_rate=number(row,'evlu_pfls_rt')))
     return result
 
-def pending(start=None,end=None,mode='vps'):
+def order_history(start=None,end=None,mode='vps',include_fills=True):
     # inquire-nccs is live-only. Paper uses the supported all-order inquiry and filters remaining qty.
     today=datetime.now(timezone.utc).date()
     start=start or (today-timedelta(days=30)).strftime('%Y%m%d')
@@ -121,13 +122,14 @@ def pending(start=None,end=None,mode='vps'):
     result=[]
     for row in rows:
         remaining=number(row,'nccs_qty')
-        if remaining <= 0: continue
         exchange=REVERSE_EXCHANGES.get(row.get('ovrs_excg_cd'))
         if not exchange: continue # this all-market query can include non-US orders
         value=instrument(exchange.upper()+':'+row['pdno'])
         result.append(dict(order_no=row['odno'],instrument_id=value.id,currency='USD',
                            exchange=exchange,quantity=number(row,'ft_ord_qty'),remaining=remaining,
-                           price=number(row,'ft_ord_unpr3'),provider_date=row.get('ord_dt'),
+                           price=number(row,'ft_ord_unpr3'),filled=number(row,'ft_ccld_qty') if include_fills else None,
+                           cancelled=row.get('rvse_cncl_dvsn')=='02',rejected=bool(str(row.get('rjct_rson') or '').strip('0 ')),
+                           original_order_no=row.get('orgn_odno'),provider_date=row.get('ord_dt'),
                            provider_time=row.get('ord_tmd'),action={'02':'BUY','01':'SELL'}.get(row.get('sll_buy_dvsn_cd'),'UNKNOWN')))
     return result
 
@@ -137,7 +139,8 @@ def buyable(code,price,mode='vps'):
               'OVRS_ORD_UNPR':validate_price(price),'ITEM_CD':value.ticker},mode=mode).getBody()
     row=getattr(body,'output',None)
     if not isinstance(row,dict): raise ValueError('주문 가능 응답 형식 오류')
-    return dict(currency='USD',amount=number(row,'ovrs_ord_psbl_amt'),quantity=number(row,'max_ord_psbl_qty'))
+    return dict(currency='USD',amount=number(row,'ovrs_ord_psbl_amt'),quantity=number(row,'max_ord_psbl_qty'),
+                amount_decimal=str(row['ovrs_ord_psbl_amt']),quantity_decimal=str(row['max_ord_psbl_qty']))
 
 def cancel(code,order_no,quantity,mode='vps'):
     value=instrument(code)
@@ -146,3 +149,7 @@ def cancel(code,order_no,quantity,mode='vps'):
          'PDNO':value.ticker,'ORGN_ODNO':order_no,'RVSE_CNCL_DVSN_CD':'02','ORD_QTY':str(quantity),
          'OVRS_ORD_UNPR':'0','MGCO_APTM_ODNO':'','ORD_SVR_DVSN_CD':'0'},True,mode=mode).getBody()
     return dict(status='accepted',order_no=order_no,message='취소 요청 접수: 주문내역 재조회로 확인하세요')
+
+
+def pending(start=None,end=None,mode='vps'):
+    return [row for row in order_history(start,end,mode,include_fills=False) if row['remaining'] > 0 and not row['cancelled'] and not row['rejected']]

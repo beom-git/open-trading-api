@@ -4,6 +4,8 @@ KIS 전략 빌더 - FastAPI Backend
 
 import os
 import sys
+import asyncio
+from contextlib import asynccontextmanager, suppress
 
 # 프로젝트 루트를 path에 추가
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -14,8 +16,19 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.routers import strategy, auth, market, orders, account, files, symbols, backtest, us_paper, us_stock, watchlist
 
+from core.auto_trading import service
+
+@asynccontextmanager
+async def lifespan(app):
+    worker = asyncio.create_task(service().run())
+    yield
+    worker.cancel()
+    with suppress(asyncio.CancelledError):
+        await worker
+
 # FastAPI 앱 생성
 app = FastAPI(
+    lifespan=lifespan,
     title="KIS Strategy Builder",
     description="한국투자증권 전략 빌더",
     version="1.0.0"
@@ -34,6 +47,8 @@ app.add_middleware(
 )
 
 # 라우터 등록
+from backend.routers import auto_trading
+app.include_router(auto_trading.router, prefix="/api/auto-trading", tags=["자동매매"])
 app.include_router(auth.router, prefix="/api/auth", tags=["인증"])
 app.include_router(strategy.router, prefix="/api/strategies", tags=["전략"])
 app.include_router(market.router, prefix="/api/market", tags=["시장정보"])
