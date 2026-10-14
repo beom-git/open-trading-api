@@ -30,3 +30,6 @@ def holdings():return read(us_stock.holdings)
 def pending():return read(lambda mode:us_stock.pending(mode=mode))
 @router.get('/buyable')
 def buyable(instrument_id:str,price:Decimal):return read(lambda mode:us_stock.buyable(instrument_id,price,mode))
+
+@router.get("/history")
+def history():return read(lambda mode:us_stock.order_history(mode=mode))

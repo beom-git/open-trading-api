@@ -6,6 +6,7 @@ export type AuthMode = "vps" | "prod";
 
 export interface AuthStatus {
   authenticated: boolean;
+  paper_only?: boolean;
   mode: AuthMode;
   mode_display?: string;
   account?: string;
@@ -20,6 +21,7 @@ export interface LoginRequest {
 export interface LoginResponse {
   status: "success" | "error";
   authenticated: boolean;
+  paper_only?: boolean;
   mode: AuthMode;
   mode_display?: string;
   can_switch_mode?: boolean;
@@ -34,6 +36,7 @@ export interface SwitchModeResponse {
   status: "success" | "error";
   message?: string;
   authenticated: boolean;
+  paper_only?: boolean;
   mode: AuthMode;
   mode_display?: string;
   can_switch_mode?: boolean;

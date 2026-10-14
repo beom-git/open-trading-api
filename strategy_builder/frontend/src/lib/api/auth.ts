@@ -28,6 +28,7 @@ export async function getAuthStatus(): Promise<ApiResponse<AuthStatus>> {
     status: response.authenticated ? "success" : "error",
     data: {
       authenticated: response.authenticated,
+      paper_only: response.paper_only,
       mode: response.mode || "vps",
       mode_display: response.mode_display,
       can_switch_mode: response.can_switch_mode,

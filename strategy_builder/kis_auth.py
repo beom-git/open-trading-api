@@ -147,6 +147,17 @@ def _setTRENV(cfg):
     _TRENV = nt1(**d)
 
 
+def paper_only():
+    return os.environ.get("KIS_PAPER_ONLY", "").lower() in ("1", "true", "yes")
+
+
+def require_allowed_mode(mode):
+    if mode not in ("vps", "prod"):
+        raise ValueError("인증 모드는 vps 또는 prod여야 합니다")
+    if paper_only() and mode != "vps":
+        raise ValueError("이 서버는 모의투자 전용입니다 (KIS_PAPER_ONLY)")
+
+
 def isPaperTrading():  # 모의투자 매매
     return _isPaper
 
@@ -154,6 +165,7 @@ def isPaperTrading():  # 모의투자 매매
 # 실전투자면 'prod', 모의투자면 'vps'를 셋팅 하시기 바랍니다.
 @with_trading_context
 def changeTREnv(token_key, svr="prod", product=None):
+    require_allowed_mode(svr)
     product = _cfg["my_prod"] if product is None else product
     cfg = dict()
 
@@ -212,6 +224,7 @@ def _getResultObject(json_data):
 # 모의투자인 경우  svr='vps', 투자계좌(01)이 아닌경우 product='XX' 변경하세요 (계좌번호 뒤 2자리)
 @with_trading_context
 def auth(svr="prod", product=None, url=None):
+    require_allowed_mode(svr)
     product = _cfg["my_prod"] if product is None else product
     p = {
         "grant_type": "client_credentials",
@@ -440,6 +453,8 @@ def _url_fetch(
         api_url, ptr_id, tr_cont, params, appendHeaders=None, postFlag=False, hashFlag=True, timeout=None
 ):
     global _last_api_call_time
+    if paper_only() and not isPaperTrading():
+        raise ValueError("모의투자 전용 서버에서 실전 API 요청 차단")
 
     # Rate Limiting: 모의투자 0.5초, 실전 0.05초 최소 간격 보장
     with _rate_lock:

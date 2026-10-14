@@ -84,7 +84,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
 
   if (!isOpen) return null;
 
-  const canSwitch = status.can_switch_mode !== false && cooldownTimer === 0;
+  const canSwitch = !status.paper_only && status.can_switch_mode !== false && cooldownTimer === 0;
   const isVps = status.mode === "vps";
 
   return (
@@ -213,7 +213,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                       handleSwitchMode();
                     }
                   }}
-                  disabled={isLoading || (status.authenticated && !isVps) || (status.authenticated && isVps && !canSwitch)}
+                  disabled={status.paper_only || isLoading || (status.authenticated && !isVps) || (status.authenticated && isVps && !canSwitch)}
                   className={`py-2 px-3 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 ${
                     !isVps && status.authenticated
                       ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 ring-2 ring-green-500 cursor-default"
@@ -227,7 +227,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                   ) : (
                     <>
                       <span className="w-2 h-2 rounded-full bg-green-500" />
-                      실전투자
+                      {status.paper_only ? "실전투자 (서버에서 차단)" : "실전투자"}
                     </>
                   )}
                 </button>

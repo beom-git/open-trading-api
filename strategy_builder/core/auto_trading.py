@@ -126,6 +126,12 @@ class Engine:
             holdings=us_stock.holdings(mode)
             held=sum(whole_quantity(h['quantity']) for h in holdings if h['instrument_id']==CODE)
             if held<s['owned']:raise ValueError('자동매매 보유량과 실제 잔고 불일치')
+            pending=us_stock.pending(mode=mode)
+            if any(o['instrument_id']==CODE for o in pending):raise ValueError('계좌에 기존 미체결 주문 있음')
+            quote=overseas_data.latest_minute(parse_instrument(CODE))
+            price=calculation(0,0,quote['price'],s['config'])['limit_price_usd']
+            us_stock.buyable(CODE,price,mode)
+            self.check(dict(mode=mode,account=identity))
             s.update(running=True,reason=None,account=identity,mode=mode,basis=baseline['basis_date'],decision=baseline,
                      manual=held-s['owned'],next_run=now().isoformat())
         return self.snapshot()
